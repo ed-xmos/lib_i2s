@@ -18,7 +18,7 @@ on tile[0]: clock bclk = XS1_CLKBLK_2;
 on tile[0]: port p_i2c = XS1_PORT_4A;
 on tile[0]: port p_gpio = XS1_PORT_8C;
 
-#define SAMPLE_FREQUENCY 48000
+#define SAMPLE_FREQUENCY 192000
 #define MASTER_CLOCK_FREQUENCY 24576000
 
 #define CS5368_ADDR           0x4C // I2C address of the CS5368 DAC
@@ -117,11 +117,28 @@ void i2s_loopback(server i2s_callback_if i2s,
       reset_codecs(i2c);
       break;
 
+/* Delay tolerance log before 192KHz broken
+ * Vanilla, 2ch, 192KHz - 15
+ * Vanilla, 4ch, 192KHz - 8
+ * Vanilla, 8ch, 192KHz - Not possible (168KHz)
+ * HW_CLK,  4ch, 192KHz - 9
+ */
+
+#define DELAY   8  //ticks
+
     case i2s.receive(size_t index, int32_t sample):
+      timer t;
+      int time;
+      t :> time;
+      t when timerafter(time + DELAY) :> void;
       samples[index] = sample;
       break;
 
     case i2s.send(size_t index) -> int32_t sample:
+      timer t;
+      int time;
+      t :> time;
+      t when timerafter(time + DELAY) :> void;
       sample = samples[index];
       break;
 
@@ -147,9 +164,7 @@ int main()
   par {
     on tile[0]: {
       /* System setup, I2S + Codec control over I2C */
-      configure_clock_src(mclk, p_mclk);
-      start_clock(mclk);
-      i2s_master(i_i2s, p_dout, 4, p_din, 4, p_bclk, p_lrclk, bclk, mclk);
+      i2s_master(i_i2s, p_dout, 2, p_din, 4, p_bclk, p_lrclk, p_mclk, bclk, mclk);
     }
 
     on tile[0]: [[distribute]] i2c_master_single_port(i_i2c, 1, p_i2c, 100, 0, 1, 0);

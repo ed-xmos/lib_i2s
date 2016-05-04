@@ -26,6 +26,7 @@ void i2s_master(client i2s_callback_if i2s_i,
                 static const size_t num_in,
                 out buffered port:32 p_bclk,
                 out buffered port:32 p_lrclk,
+                in port p_mclk,
                 clock bclk,
                 const clock mclk)
 {}

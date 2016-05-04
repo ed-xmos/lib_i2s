@@ -3,6 +3,7 @@
 #include <xclib.h>
 #include "i2s.h"
 #include "xassert.h"
+#include "debug_print.h"
 
 static const unsigned i2s_clk_mask_lookup[5] = {
         0xaaaaaaaa, //div 2
@@ -20,10 +21,18 @@ static void i2s_init_ports(
         out buffered port:32 p_bclk,
         out buffered port:32 p_lrclk,
         clock bclk,
-        const clock mclk){
+        in port p_mclk,
+        const clock mclk,
+        unsigned mclk_bclk_ratio){
+
     set_clock_on(bclk);
+#if USE_HW_DIVIDER
+    configure_clock_src_divide(bclk, p_mclk, mclk_bclk_ratio >> 1);
+    configure_port_clock_output(p_bclk, bclk);
+#else
     configure_clock_src(bclk, p_bclk);
     configure_out_port(p_bclk, mclk, 1);
+#endif
     configure_out_port(p_lrclk, bclk, 1);
     for (size_t i = 0; i < num_out; i++)
         configure_out_port(p_dout[i], bclk, 0);
@@ -35,8 +44,10 @@ static void i2s_init_ports(
 #define FRAME_WORDS 2
 
 static void inline i2s_output_clock_pair(out buffered port:32 p_bclk,unsigned clk_mask){
+#if !USE_HW_DIVIDER
     p_bclk <: clk_mask;
     p_bclk <: clk_mask;
+#endif
 }
 
 #pragma unsafe arrays
@@ -183,10 +194,17 @@ static void i2s_master0(client i2s_callback_if i2s_i,
                 static const size_t num_in,
                 out buffered port:32 p_bclk,
                 out buffered port:32 p_lrclk,
+                in port p_mclk,
                 clock bclk,
-                const clock mclk){
-
+                clock mclk){
     while(1){
+        debug_printf("config.mclk_bclk_ratio=%d\n",config.mclk_bclk_ratio);
+
+#if !USE_HW_DIVIDER
+        configure_clock_src(mclk, p_mclk);
+        start_clock(mclk);
+#endif
+
         i2s_config_t config;
         unsigned mclk_bclk_ratio_log2;
         i2s_i.init(config, null);
@@ -198,8 +216,8 @@ static void i2s_master0(client i2s_callback_if i2s_i,
         mclk_bclk_ratio_log2 = clz(bitrev(config.mclk_bclk_ratio));
 
         //This ensures that the port time on all the ports is at 0
-        i2s_init_ports(p_dout, num_out, p_din, num_in,
-           p_bclk, p_lrclk, bclk, mclk);
+        i2s_init_ports(p_dout, num_out, p_din, num_in, p_bclk, p_lrclk, bclk,
+            p_mclk, mclk, config.mclk_bclk_ratio);
 
         i2s_restart_t restart =
           i2s_ratio_n(i2s_i, p_dout, num_out, p_din,
@@ -219,10 +237,11 @@ inline void i2s_master1(client interface i2s_callback_if i,
         static const size_t num_i2s_in,
         out buffered port:32 i2s_bclk,
         out buffered port:32 i2s_lrclk,
+        in port p_mclk,
         clock clk_bclk,
-        const clock clk_mclk) {
+        clock clk_mclk) {
     i2s_master0(i, i2s_dout, num_i2s_out, i2s_din, num_i2s_in,
-                i2s_bclk, i2s_lrclk,
+                i2s_bclk, i2s_lrclk, p_mclk,
                 clk_bclk, clk_mclk);
 }
 
