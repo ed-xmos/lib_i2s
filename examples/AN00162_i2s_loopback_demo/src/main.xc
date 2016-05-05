@@ -4,6 +4,11 @@
 #include "i2s.h"
 #include "i2c.h"
 #include "gpio.h"
+#include "print.h"
+
+#define SIM     1
+#define I2S_LINES 1
+#define DBG     0
 
 /* Ports and clocks used by the application */
 on tile[0]: out buffered port:32 p_lrclk = XS1_PORT_1G;
@@ -18,7 +23,10 @@ on tile[0]: clock bclk = XS1_CLKBLK_2;
 on tile[0]: port p_i2c = XS1_PORT_4A;
 on tile[0]: port p_gpio = XS1_PORT_8C;
 
-#define SAMPLE_FREQUENCY 48000
+on tile[0]: out port p_tp0      = XS1_PORT_1D;   //Coax Tx
+on tile[0]: out port p_tp1      = XS1_PORT_1E;   //Opt Tx
+
+#define SAMPLE_FREQUENCY 192000
 #define MASTER_CLOCK_FREQUENCY 24576000
 
 #define CS5368_ADDR           0x4C // I2C address of the CS5368 DAC
@@ -99,6 +107,7 @@ void i2s_loopback(server i2s_callback_if i2s,
       i2s_config.mode = I2S_MODE_I2S;
       i2s_config.mclk_bclk_ratio = (MASTER_CLOCK_FREQUENCY/SAMPLE_FREQUENCY)/64;
 
+#if !SIM
       // Set CODECs in reset
       dac_reset.output(0);
       adc_reset.output(0);
@@ -115,18 +124,30 @@ void i2s_loopback(server i2s_callback_if i2s,
       adc_reset.output(1);
 
       reset_codecs(i2c);
+#endif
+      debug_printf("Init\n");
       break;
 
     case i2s.receive(size_t index, int32_t sample):
       samples[index] = sample;
+#if DBG
+      printchar('r');printintln(index);
+#endif
       break;
 
     case i2s.send(size_t index) -> int32_t sample:
-      sample = samples[index];
+      //sample = samples[index];
+        sample = 0xFFFFFFFF;
+#if DBG
+      printchar('s');printintln(index);
+#endif
       break;
 
     case i2s.restart_check() -> i2s_restart_t restart:
       restart = I2S_NO_RESTART;
+#if DBG
+      printstrln("restart");
+#endif
       break;
     }
   }
@@ -147,9 +168,14 @@ int main()
   par {
     on tile[0]: {
       /* System setup, I2S + Codec control over I2C */
+#if SIM
+      configure_clock_ref(mclk, 2); //25Mz
+#else
       configure_clock_src(mclk, p_mclk);
+#endif
       start_clock(mclk);
-      i2s_master(i_i2s, p_dout, 4, p_din, 4, p_bclk, p_lrclk, bclk, mclk);
+
+      i2s_master(i_i2s, p_dout, I2S_LINES, p_din, I2S_LINES, p_bclk, p_lrclk, bclk, mclk);
     }
 
     on tile[0]: [[distribute]] i2c_master_single_port(i_i2c, 1, p_i2c, 100, 0, 1, 0);

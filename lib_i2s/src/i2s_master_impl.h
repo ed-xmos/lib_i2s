@@ -3,6 +3,11 @@
 #include <xclib.h>
 #include "i2s.h"
 #include "xassert.h"
+#include "debug_print.h"
+
+
+extern out port p_tp0;
+extern out port p_tp1;
 
 static const unsigned i2s_clk_mask_lookup[5] = {
         0xaaaaaaaa, //div 2
@@ -37,6 +42,7 @@ static void i2s_init_ports(
 static void inline i2s_output_clock_pair(out buffered port:32 p_bclk,unsigned clk_mask){
     p_bclk <: clk_mask;
     p_bclk <: clk_mask;
+    debug_printf("BCLK\n");
 }
 
 #pragma unsafe arrays
@@ -56,6 +62,8 @@ static void output_word(
     //This is non-blocking
     lr_mask = ~lr_mask;
     p_lrclk <: lr_mask;
+    debug_printf("LR\n");
+
 
     unsigned if_call_num = 0;
     for(unsigned clk_pair=0; clk_pair < total_clk_pairs;clk_pair++){
@@ -63,10 +71,15 @@ static void output_word(
             if(if_call_num < num_in){
                 unsigned data;
                 asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[if_call_num]):"memory");
+                p_tp0 <: 0b1;
                 i2s_i.receive(if_call_num*FRAME_WORDS + offset, bitrev(data));
+                p_tp0 <: 0b0;
             } else if(if_call_num < num_in + num_out){
                 unsigned index = if_call_num - num_in;
-                p_dout[index] <: bitrev(i2s_i.send(index*FRAME_WORDS + offset));
+                p_tp1 <: 0b1;
+                unsigned tmp = bitrev(i2s_i.send(index*FRAME_WORDS + offset));
+                p_tp1 <: 0b0;
+                p_dout[index] <: tmp;
             }
             if_call_num++;
         }
@@ -74,6 +87,49 @@ static void output_word(
         i2s_output_clock_pair(p_bclk,  clk_mask);
     }
 }
+
+static void output_word_opt_192_4i_4o(
+        out buffered port:32 p_lrclk,
+        unsigned &lr_mask,
+        unsigned total_clk_pairs,
+        client i2s_callback_if i2s_i,
+        out buffered port:32 (&?p_dout)[num_out],
+        static const size_t num_out,
+        in buffered port:32 (&?p_din)[num_in],
+        static const size_t num_in,
+        out buffered port:32 p_bclk,
+        unsigned clk_mask,
+        unsigned calls_per_pair,
+        unsigned offset){
+    //This is non-blocking
+    lr_mask = ~lr_mask;
+    p_lrclk <: lr_mask;
+    debug_printf("LR\n");
+
+
+    unsigned if_call_num = 0;
+    for(unsigned clk_pair=0; clk_pair < total_clk_pairs;clk_pair++){
+        for(unsigned i=0;i<8;i++){
+            if(if_call_num < num_in){
+                unsigned data;
+                asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[if_call_num]):"memory");
+                p_tp0 <: 0b1;
+                i2s_i.receive(if_call_num*FRAME_WORDS + offset, bitrev(data));
+                p_tp0 <: 0b0;
+            } else if(if_call_num < num_in + num_out){
+                unsigned index = if_call_num - num_in;
+                p_tp1 <: 0b1;
+                unsigned tmp = bitrev(i2s_i.send(index*FRAME_WORDS + offset));
+                p_tp1 <: 0b0;
+                p_dout[index] <: tmp;
+            }
+            if_call_num++;
+        }
+        //This is blocking
+        i2s_output_clock_pair(p_bclk,  clk_mask);
+    }
+}
+
 #pragma unsafe arrays
 static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
         out buffered port:32 (&?p_dout)[num_out],
@@ -90,6 +146,20 @@ static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
 
     unsigned total_clk_pairs = (1<<(ratio-1));
     unsigned calls_per_pair = ((num_in + num_out) + (1<<(ratio-1))-1)>>(ratio-1);
+
+    debug_printf("num_out=%d\n", num_out);
+    debug_printf("num_in=%d\n", num_in);
+    debug_printf("total_clk_pairs=%d\n", total_clk_pairs);
+    debug_printf("calls_per_pair=%d\n", calls_per_pair);
+    debug_printf("log2 ratio=%d\n", ratio);
+    debug_printf("FRAME_WORDS=%d\n", FRAME_WORDS);
+    debug_printf("clk_mask=0x%x\n", clk_mask);
+
+
+
+
+
+
 
     for(size_t i=0;i<num_out;i++)
         clearbuf(p_dout[i]);
