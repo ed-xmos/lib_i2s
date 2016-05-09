@@ -5,8 +5,6 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define     USE_HW_DIVIDER      0
-
 /** I2S mode.
  *
  *  This type is used to describe the I2S mode.

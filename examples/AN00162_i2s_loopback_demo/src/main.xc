@@ -4,6 +4,15 @@
 #include "i2s.h"
 #include "i2c.h"
 #include "gpio.h"
+#include "xassert.h"
+#include <print.h>
+#include <stdlib.h>
+
+#define NUM_I2S_LINES   4
+#define BURN_THREADS    0
+#define SAMPLE_FREQUENCY 192000
+#define MASTER_CLOCK_FREQUENCY 24576000
+
 
 /* Ports and clocks used by the application */
 on tile[0]: out buffered port:32 p_lrclk = XS1_PORT_1G;
@@ -17,9 +26,6 @@ on tile[0]: clock bclk = XS1_CLKBLK_2;
 
 on tile[0]: port p_i2c = XS1_PORT_4A;
 on tile[0]: port p_gpio = XS1_PORT_8C;
-
-#define SAMPLE_FREQUENCY 192000
-#define MASTER_CLOCK_FREQUENCY 24576000
 
 #define CS5368_ADDR           0x4C // I2C address of the CS5368 DAC
 #define CS5368_GCTL_MDE       0x01 // I2C mode control register number
@@ -84,6 +90,12 @@ void reset_codecs(client i2c_master_if i2c)
   i2c.write_reg(CS5368_ADDR, CS5368_PWR_DN, 0b00000000);
 }
 
+int delay = 0;
+
+unsafe{
+    int * unsafe delay_ptr = &delay;
+}
+
 [[distributable]]
 void i2s_loopback(server i2s_callback_if i2s,
                   client i2c_master_if i2c,
@@ -99,6 +111,7 @@ void i2s_loopback(server i2s_callback_if i2s,
       i2s_config.mode = I2S_MODE_I2S;
       i2s_config.mclk_bclk_ratio = (MASTER_CLOCK_FREQUENCY/SAMPLE_FREQUENCY)/64;
 
+#if !SIM
       // Set CODECs in reset
       dac_reset.output(0);
       adc_reset.output(0);
@@ -115,31 +128,50 @@ void i2s_loopback(server i2s_callback_if i2s,
       adc_reset.output(1);
 
       reset_codecs(i2c);
+#endif
       break;
 
-/* Delay tolerance log before 192KHz broken
- * Vanilla, 2ch, 192KHz - 15
- * Vanilla, 4ch, 192KHz - 8
- * Vanilla, 8ch, 192KHz - Not possible (168KHz)
- * HW_CLK,  4ch, 192KHz - 9
+/* Delay tolerance log before 192KHz broken @ 100MHz
+ * Vanilla, 2ch, 192KHz - 86
+ * Vanilla, 4ch, 192KHz - 32
+ * Vanilla, 6ch, 192KHz - 15
+ * Vanilla, 8ch, 192KHz - 6
+ * HW_CLK,  2ch, 192KHz - 104
+ * HW_CLK,  4ch, 192KHz - 44
+ * HW_CLK,  6ch, 192KHz - 24
+ * HW_CLK,  8ch, 192KHz - 14
  */
 
-#define DELAY   8  //ticks
+/* Delay tolerance log before 192KHz broken @ 62.5MHz
+* Vanilla, 2ch, 192KHz - 4
+* Vanilla, 4ch, 192KHz - 9
+* Vanilla, 6ch, 192KHz - N/A
+* Vanilla, 8ch, 192KHz - N/A
+* HW_CLK,  2ch, 192KHz - 8
+* HW_CLK,  4ch, 192KHz - 8
+* HW_CLK,  6ch, 192KHz - 1
+* HW_CLK,  8ch, 192KHz - N/A
+*/
+
 
     case i2s.receive(size_t index, int32_t sample):
       timer t;
       int time;
       t :> time;
-      t when timerafter(time + DELAY) :> void;
       samples[index] = sample;
+      t when timerafter(time + delay) :> void;
       break;
 
     case i2s.send(size_t index) -> int32_t sample:
       timer t;
       int time;
       t :> time;
-      t when timerafter(time + DELAY) :> void;
+#if SIM
+      sample = 0xFFFFFFFF;
+#else
       sample = samples[index];
+#endif
+      t when timerafter(time + delay) :> void;
       break;
 
     case i2s.restart_check() -> i2s_restart_t restart:
@@ -156,6 +188,45 @@ static char gpio_pin_map[4] =  {
   GPIO_MCLK_FSEL
 };
 
+#if SIM
+#define DIFF_WRAP_16(new, old)  (new > old ? new - old : new + 0x10000 - old)
+on tile[0]: port p_lr_test = XS1_PORT_1A;
+unsafe void test_lr_period(void){
+    set_core_fast_mode_on();    //Burn all MIPS
+
+    int time, time_old;
+    int diff;
+    for(int i=0; i<4;i++){
+        p_lr_test when pinseq(0) :> void;
+        p_lr_test when pinseq(1) :> void;
+    }
+    const int period = (XS1_TIMER_HZ/(25000000/(MASTER_CLOCK_FREQUENCY/SAMPLE_FREQUENCY)));
+    printintln(period);
+    p_lr_test :> void @ time;
+    time_old = time;
+    while(1){
+        p_lr_test when pinseq(0) :> void;
+        p_lr_test when pinseq(1) :> void @ time;
+        //diff = sext(time, 16) - sext(time_old, 16);
+        diff = DIFF_WRAP_16(time, time_old);
+        if (diff > period){
+            printstr("LR_CLOCK period timing fail at delay = ");
+            printuintln(*delay_ptr);
+            printintln(diff);
+            printintln(period);
+            delay_milliseconds(1);
+            _Exit(0);
+        }
+        time_old = time;
+        (*delay_ptr)++;
+    }
+}
+#endif
+
+void burn(void){
+    while(1);
+}
+
 int main()
 {
   interface i2s_callback_if i_i2s;
@@ -164,7 +235,7 @@ int main()
   par {
     on tile[0]: {
       /* System setup, I2S + Codec control over I2C */
-      i2s_master(i_i2s, p_dout, 2, p_din, 4, p_bclk, p_lrclk, p_mclk, bclk, mclk);
+      i2s_master(i_i2s, p_dout, NUM_I2S_LINES, p_din, NUM_I2S_LINES, p_bclk, p_lrclk, p_mclk, bclk, mclk);
     }
 
     on tile[0]: [[distribute]] i2c_master_single_port(i_i2c, 1, p_i2c, 100, 0, 1, 0);
@@ -172,6 +243,11 @@ int main()
 
     /* The application - loopback the I2S samples */
     on tile[0]: [[distribute]] i2s_loopback(i_i2s, i_i2c[0], i_gpio[0], i_gpio[1], i_gpio[2], i_gpio[3]);
+
+#if SIM
+    on tile[0]: unsafe{test_lr_period();}
+#endif
+    on tile[0]: par (int i=0; i<(BURN_THREADS > 0 ? BURN_THREADS - SIM : 0); i++) {burn();};
   }
   return 0;
 }

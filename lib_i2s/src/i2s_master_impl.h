@@ -4,6 +4,7 @@
 #include "i2s.h"
 #include "xassert.h"
 #include "debug_print.h"
+#include <print.h>
 
 static const unsigned i2s_clk_mask_lookup[5] = {
         0xaaaaaaaa, //div 2
@@ -27,7 +28,11 @@ static void i2s_init_ports(
 
     set_clock_on(bclk);
 #if USE_HW_DIVIDER
+#if SIM
+    configure_clock_ref(bclk, mclk_bclk_ratio << 1);
+#else
     configure_clock_src_divide(bclk, p_mclk, mclk_bclk_ratio >> 1);
+#endif
     configure_port_clock_output(p_bclk, bclk);
 #else
     configure_clock_src(bclk, p_bclk);
@@ -38,7 +43,9 @@ static void i2s_init_ports(
         configure_out_port(p_dout[i], bclk, 0);
     for (size_t i = 0; i < num_in; i++)
         configure_in_port(p_din[i], bclk);
+#if !USE_HW_DIVIDER
     start_clock(bclk);
+#endif
 }
 
 #define FRAME_WORDS 2
@@ -92,6 +99,7 @@ static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
         in buffered port:32 (&?p_din)[num_in],
         static const size_t num_in,
         out buffered port:32 p_bclk,
+        clock bclk,
         out buffered port:32 p_lrclk,
         unsigned ratio,
         i2s_mode_t mode){
@@ -109,6 +117,7 @@ static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
     clearbuf(p_lrclk);
     clearbuf(p_bclk);
 
+
     //Preload word 0
     if(mode == I2S_MODE_I2S){
         for(size_t i=0;i<num_out;i++)
@@ -117,7 +126,12 @@ static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
         for(size_t i=0;i<num_in;i++)
             asm("setpt res[%0], %1"::"r"(p_din[i]), "r"(32+1));
         lr_mask = 0x80000000;
+        //Start BCLK going
+#if USE_HW_DIVIDER
+        start_clock(bclk);
+#else
         partout(p_bclk, 1<<ratio, clk_mask);
+#endif
      } else {
        for(size_t i=0;i<num_out;i++)
            p_dout[i] <: bitrev(i2s_i.send(i*FRAME_WORDS));
@@ -166,7 +180,9 @@ static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
                 if(clk_pair < total_clk_pairs-1)
                     i2s_output_clock_pair(p_bclk,  clk_mask);
             }
+#if !USE_HW_DIVIDER
             sync(p_bclk);
+#endif
             for(size_t i=0;i<num_in;i++){
                 asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[i]):"memory");
                 i2s_i.receive(i*FRAME_WORDS + FRAME_WORDS - 1, bitrev(data));
@@ -201,7 +217,11 @@ static void i2s_master0(client i2s_callback_if i2s_i,
         debug_printf("config.mclk_bclk_ratio=%d\n",config.mclk_bclk_ratio);
 
 #if !USE_HW_DIVIDER
+#if SIM
+        configure_clock_ref(mclk, 2); //25Mz
+#else
         configure_clock_src(mclk, p_mclk);
+#endif
         start_clock(mclk);
 #endif
 
@@ -221,7 +241,7 @@ static void i2s_master0(client i2s_callback_if i2s_i,
 
         i2s_restart_t restart =
           i2s_ratio_n(i2s_i, p_dout, num_out, p_din,
-                      num_in, p_bclk, p_lrclk,
+                      num_in, p_bclk, bclk, p_lrclk,
                       mclk_bclk_ratio_log2, config.mode);
         if (restart == I2S_SHUTDOWN)
           return;
