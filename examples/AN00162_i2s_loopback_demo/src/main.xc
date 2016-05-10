@@ -8,9 +8,15 @@
 #include <print.h>
 #include <stdlib.h>
 
+#ifndef NUM_I2S_LINES
 #define NUM_I2S_LINES   4
+#endif
+#ifndef BURN_THREADS
 #define BURN_THREADS    0
+#endif
+#ifndef SAMPLE_FREQUENCY
 #define SAMPLE_FREQUENCY 192000
+#endif
 #define MASTER_CLOCK_FREQUENCY 24576000
 
 
@@ -201,7 +207,6 @@ unsafe void test_lr_period(void){
         p_lr_test when pinseq(1) :> void;
     }
     const int period = (XS1_TIMER_HZ/(25000000/(MASTER_CLOCK_FREQUENCY/SAMPLE_FREQUENCY)));
-    printintln(period);
     p_lr_test :> void @ time;
     time_old = time;
     while(1){
@@ -210,11 +215,11 @@ unsafe void test_lr_period(void){
         //diff = sext(time, 16) - sext(time_old, 16);
         diff = DIFF_WRAP_16(time, time_old);
         if (diff > period){
-            printstr("LR_CLOCK period timing fail at delay = ");
+            printstr("Case backpressure breaks at delay ticks=");
             printuintln(*delay_ptr);
-            printintln(diff);
-            printintln(period);
-            delay_milliseconds(1);
+            //printintln(diff);
+            //printintln(period);
+            delay_milliseconds(1); //Let the print out
             _Exit(0);
         }
         time_old = time;
