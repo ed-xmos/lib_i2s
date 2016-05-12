@@ -86,7 +86,7 @@ typedef interface i2s_callback_if {
    *                    I2S codecs are 24-bit), in which case the bottom bits
    *                    are ignored.
    */
-  void receive(size_t index, int32_t sample);
+  void receive(size_t num_in, int32_t sample[num_in]);
 
   /** Request an outgoing sample.
    *
@@ -98,7 +98,7 @@ typedef interface i2s_callback_if {
    *                    I2S codecs are 24-bit), in which case the bottom bits
    *                    will be arbitrary values.
    */
-  int32_t send(size_t index);
+  void send(size_t num_out, int32_t sample[num_out]);
 
 } i2s_callback_if;
 
@@ -136,115 +136,7 @@ void i2s_master(client i2s_callback_if i2s_i,
                 clock bclk,
                 clock mclk);
 
-/** I2S slave component.
- *
- *  This task performs I2S on the provided pins. It will perform callbacks over
- *  the i2s_callback_if interface to get/receive data from the application
- *  using this component.
- *
- *  The component performs I2S slave so will expect the word clock and
- *  bit clock to be driven externally.
- *
- *  \param i2s_i          The I2S callback interface to connect to
- *                        the application
- *  \param p_dout         An array of data output ports
- *  \param num_out        The number of output data ports
- *  \param p_din          An array of data input ports
- *  \param num_in         The number of input data ports
- *  \param p_bclk         The bit clock input port
- *  \param p_lrclk        The word clock input port
- *  \param bclk           A clock that will get configured for use with
- *                        the bit clock
- */
-void i2s_slave(client i2s_callback_if i2s_i,
-        out buffered port:32 (&?p_dout)[num_out],
-        static const size_t num_out,
-        in buffered port:32 (&?p_din)[num_in],
-        static const size_t num_in,
-        in port p_bclk,
-        in buffered port:32 p_lrclk,
-        clock bclk);
-
-/** TDM master component.
- *
- *  This task performs TDM on the provided pins. It will perform callbacks over
- *  the i2s_callback_if interface to get/receive data from the application
- *  using this component.
- *
- *  The component performs as TDM master so will drive the fsync signal.
- *
- *  \param tdm_i          The TDM callback interface to connect to
- *                        the application
- *  \param p_fsync        The frame sync output port
- *  \param p_dout         An array of data output ports
- *  \param num_out        The number of output data ports
- *  \param p_din          An array of data input ports
- *  \param num_in         The number of input data ports
- *  \param clk            The clock connected to the bit/master clock frequency.
- *                        Usually this should be configured to be driven by
- *                        an incoming master system clock.
- */
-void tdm_master(client interface i2s_callback_if tdm_i,
-        out buffered port:32 p_fsync,
-        out buffered port:32 (&?p_dout)[num_out],
-        size_t num_out,
-        in buffered port:32 (&?p_din)[num_in],
-        size_t num_in,
-        clock clk);
-
-/** I2S master + TDM master component.
- *
- *  This task performs I2S and TDM
- *  on the provided pins. The signals need to be synchronized.
- *  It will perform callbacks over
- *  the i2s_callback_if interface to get/receive data from the application
- *  using this component.
- *
- *  The component assumes that the bit clock of the TDM signal is the
- *  same as the master clock of the I2S signal.
- *
- *  The component performs I2S master so will drive the word clock and
- *  bit clock lines. It will also acts as TDM master and drives the fsync
- *  signal.
- *
- *  \param tdm_i          The TDM callback interface to connect to
- *                        the application
- *  \param i2s_dout       An array of I2S data output ports
- *  \param num_i2s_out    The number of I2S output data ports
- *  \param i2s_din        An array of I2S data input ports
- *  \param num_i2s_in     The number of I2S input data ports
- *  \param i2s_bclk       The I2S bit clock output port
- *  \param i2s_lrclk      The I2S word clock output port
- *  \param tdm_fsync      The TDM frame sync output port
- *  \param tdm_dout       An array of TDM data output ports
- *  \param num_tdm_out    The number of TDM output data ports
- *  \param tdm_din        An array of TDM data input ports
- *  \param num_tdm_in     The number of TDM input data ports
- *  \param bclk           A clock that will get configured for use with
- *                        the I2S bit clock
- *  \param mclk           The clock connected to the master clock frequency.
- *                        Usually this should be configured to be driven by
- *                        an incoming master system clock. This clock is also
- *                        used as the TDM bit clock.
- */
-void i2s_tdm_master(client interface i2s_callback_if tdm_i,
-        out buffered port:32 i2s_dout[num_i2s_out],
-        static const size_t num_i2s_out,
-        in buffered port:32 i2s_din[num_i2s_in],
-        static const size_t num_i2s_in,
-        out buffered port:32 i2s_bclk,
-        out buffered port:32 i2s_lrclk,
-        out buffered port:32 tdm_fsync,
-        out buffered port:32 tdm_dout[num_tdm_out],
-        size_t num_tdm_out,
-        in buffered port:32 tdm_din[num_tdm_in],
-        size_t num_tdm_in,
-        clock bclk,
-        clock mclk);
 
 #include <i2s_master_impl.h>
-#include <i2s_slave_impl.h>
-#include <tdm_master_impl.h>
-#include <i2s_tdm_master_impl.h>
 
 #endif // _i2s_h_

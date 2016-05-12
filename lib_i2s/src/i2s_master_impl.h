@@ -6,13 +6,7 @@
 #include "debug_print.h"
 #include <print.h>
 
-static const unsigned i2s_clk_mask_lookup[5] = {
-        0xaaaaaaaa, //div 2
-        0xcccccccc, //div 4
-        0xf0f0f0f0, //div 8
-        0xff00ff00, //div 16
-        0xffff0000, //div 32
-};
+
 
 static void i2s_init_ports(
         out buffered port:32 (&?p_dout)[num_out],
@@ -57,41 +51,7 @@ static void inline i2s_output_clock_pair(out buffered port:32 p_bclk,unsigned cl
 #endif
 }
 
-#pragma unsafe arrays
-static void output_word(
-        out buffered port:32 p_lrclk,
-        unsigned &lr_mask,
-        unsigned total_clk_pairs,
-        client i2s_callback_if i2s_i,
-        out buffered port:32 (&?p_dout)[num_out],
-        static const size_t num_out,
-        in buffered port:32 (&?p_din)[num_in],
-        static const size_t num_in,
-        out buffered port:32 p_bclk,
-        unsigned clk_mask,
-        unsigned calls_per_pair,
-        unsigned offset){
-    //This is non-blocking
-    lr_mask = ~lr_mask;
-    p_lrclk <: lr_mask;
 
-    unsigned if_call_num = 0;
-    for(unsigned clk_pair=0; clk_pair < total_clk_pairs;clk_pair++){
-        for(unsigned i=0;i<calls_per_pair;i++){
-            if(if_call_num < num_in){
-                unsigned data;
-                asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[if_call_num]):"memory");
-                i2s_i.receive(if_call_num*FRAME_WORDS + offset, bitrev(data));
-            } else if(if_call_num < num_in + num_out){
-                unsigned index = if_call_num - num_in;
-                p_dout[index] <: bitrev(i2s_i.send(index*FRAME_WORDS + offset));
-            }
-            if_call_num++;
-        }
-        //This is blocking
-        i2s_output_clock_pair(p_bclk,  clk_mask);
-    }
-}
 #pragma unsafe arrays
 static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
         out buffered port:32 (&?p_dout)[num_out],
@@ -103,41 +63,36 @@ static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
         out buffered port:32 p_lrclk,
         unsigned ratio,
         i2s_mode_t mode){
-    unsigned clk_mask = i2s_clk_mask_lookup[ratio-1];
-    unsigned lr_mask = 0;
-    int32_t data;
 
-    unsigned total_clk_pairs = (1<<(ratio-1));
-    unsigned calls_per_pair = ((num_in + num_out) + (1<<(ratio-1))-1)>>(ratio-1);
+    int32_t in_samps[8]; //Temp hack. should be num_in << 1 but compiler thinks that isn't const
+    int32_t out_samps[8];
+
+    unsigned lr_mask = 0;
 
     for(size_t i=0;i<num_out;i++)
         clearbuf(p_dout[i]);
     for(size_t i=0;i<num_in;i++)
         clearbuf(p_din[i]);
     clearbuf(p_lrclk);
-    clearbuf(p_bclk);
 
 
     //Preload word 0
-    if(mode == I2S_MODE_I2S){
-        for(size_t i=0;i<num_out;i++)
-            p_dout[i] @ 2 <: bitrev(i2s_i.send(i*FRAME_WORDS));
-        partout(p_lrclk, 1, 0);
-        for(size_t i=0;i<num_in;i++)
-            asm("setpt res[%0], %1"::"r"(p_din[i]), "r"(32+1));
-        lr_mask = 0x80000000;
-        //Start BCLK going
+
+    for(size_t i=0;i<num_out;i++)
+        p_dout[i] @ 2 <: 0;
+    partout(p_lrclk, 1, 0);
+    for(size_t i=0;i<num_in;i++)
+        asm("setpt res[%0], %1"::"r"(p_din[i]), "r"(32+1));
+    lr_mask = 0x80000000;
+    //Start BCLK going
 #if USE_HW_DIVIDER
-        start_clock(bclk);
+    start_clock(bclk);
 #else
-        partout(p_bclk, 1<<ratio, clk_mask);
+    partout(p_bclk, 1<<ratio, clk_mask);
 #endif
-     } else {
-       for(size_t i=0;i<num_out;i++)
-           p_dout[i] <: bitrev(i2s_i.send(i*FRAME_WORDS));
-     }
+
+
      p_lrclk <: lr_mask;
-     i2s_output_clock_pair(p_bclk,  clk_mask);
 
      //This is non-blocking
      lr_mask = ~lr_mask;
@@ -145,21 +100,8 @@ static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
 
      //Now preload word 1
      unsigned if_call_num = 0;
-     for(unsigned clk_pair=0; clk_pair < total_clk_pairs;clk_pair++){
-         for(unsigned i=0;i<calls_per_pair;i++){
-             if(if_call_num < num_out)
-                 p_dout[if_call_num] <: bitrev(i2s_i.send(if_call_num*FRAME_WORDS+1));
-
-             if_call_num++;
-         }
-         //This is blocking
-         i2s_output_clock_pair(p_bclk,  clk_mask);
-     }
-
-     for(unsigned frm_word_no=1;frm_word_no < FRAME_WORDS - 1; frm_word_no++){
-         output_word(p_lrclk, lr_mask, total_clk_pairs, i2s_i, p_dout, num_out,
-                 p_din, num_in, p_bclk, clk_mask, calls_per_pair, (1 + frm_word_no)%FRAME_WORDS);
-     }
+     for(size_t i=0;i<num_out;i++)
+         p_dout[if_call_num] <: 0;
 
     //body
     while(1){
@@ -168,35 +110,61 @@ static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
 
         // The final word of each frame is special as it might terminate the transfer
         if (restart != I2S_NO_RESTART) {
-            if_call_num = 0;
-            for(unsigned clk_pair=0; clk_pair < total_clk_pairs;clk_pair++){
-                for(unsigned i=0;i<calls_per_pair;i++){
-                    if(if_call_num < num_in){
-                        asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[if_call_num]):"memory");
-                        i2s_i.receive(if_call_num*FRAME_WORDS + FRAME_WORDS - 2, bitrev(data));
-                    }
-                    if_call_num++;
-                }
-                if(clk_pair < total_clk_pairs-1)
-                    i2s_output_clock_pair(p_bclk,  clk_mask);
-            }
+            fail("Not yet implemented");
 #if !USE_HW_DIVIDER
             sync(p_bclk);
 #endif
-            for(size_t i=0;i<num_in;i++){
-                asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[i]):"memory");
-                i2s_i.receive(i*FRAME_WORDS + FRAME_WORDS - 1, bitrev(data));
-            }
             return restart;
-        } else {
-            output_word(p_lrclk, lr_mask, total_clk_pairs, i2s_i, p_dout, num_out,
-                    p_din, num_in, p_bclk, clk_mask, calls_per_pair, 0);
+        }
+        size_t idx;
+
+
+        //Main loop
+        lr_mask = ~lr_mask;
+        p_lrclk <: lr_mask;
+
+        //Input i2s odds
+        idx = 1;
+        for(size_t i=0;i<num_in;i++){
+            int32_t data;
+            asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[i]):"memory");
+            in_samps[idx] = bitrev(data);
+            idx+=2;
         }
 
-        for(unsigned frm_word_no=0;frm_word_no < FRAME_WORDS-1; frm_word_no++){
-            output_word(p_lrclk, lr_mask, total_clk_pairs, i2s_i, p_dout, num_out,
-                    p_din, num_in, p_bclk, clk_mask, calls_per_pair, (1 + frm_word_no)%FRAME_WORDS);
+        //transfer output samps
+        i2s_i.send(num_out << 1, out_samps);
+
+        //output i2s odds
+        idx = 1;
+        for(size_t i=0;i<num_out;i++){
+            p_dout[i] <: bitrev(out_samps[idx]);
+            idx+=2;
         }
+
+        lr_mask = ~lr_mask;
+        p_lrclk <: lr_mask;
+
+        //Input i2s evens
+        idx = 0;
+        for(size_t i=0;i<num_in;i++){
+            int32_t data;
+            asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[i]):"memory");
+            in_samps[idx] = bitrev(data);
+            idx+=2;
+        }
+
+        //transfer input samps
+        i2s_i.receive(num_in << 1, in_samps);
+
+        //output i2s evens
+        idx = 0;
+        for(size_t i=0;i<num_out;i++){
+            p_dout[i] <: bitrev(out_samps[idx]);
+            idx+=2;
+        }
+
+
     }
     return I2S_RESTART;
 }
@@ -247,6 +215,8 @@ static void i2s_master0(client i2s_callback_if i2s_i,
           return;
     }
 }
+
+
 
 // This function is just to avoid unused static function warnings for i2s_tdm_master0,
 // it should never be called.

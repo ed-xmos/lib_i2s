@@ -9,10 +9,10 @@
 #include <stdlib.h>
 
 #ifndef NUM_I2S_LINES
-#define NUM_I2S_LINES   1
+#define NUM_I2S_LINES   4
 #endif
 #ifndef BURN_THREADS
-#define BURN_THREADS    7
+#define BURN_THREADS    0
 #endif
 #ifndef SAMPLE_FREQUENCY
 #define SAMPLE_FREQUENCY 192000
@@ -150,22 +150,22 @@ void i2s_loopback(server i2s_callback_if i2s,
 #endif
       break;
 
-    case i2s.receive(size_t index, int32_t sample):
+    case i2s.receive(size_t num_chan_in, int32_t sample[num_chan_in]):
       timer t;
       int time;
       t :> time;
-      samples[index] = sample;
+      for (size_t i=0; i<num_chan_in; i++) samples[i] = sample[i];
       t when timerafter(time + delay) :> void;
       break;
 
-    case i2s.send(size_t index) -> int32_t sample:
+    case i2s.send(size_t num_chan_out, int32_t sample[num_chan_out]):
       timer t;
       int time;
       t :> time;
 #if SIM
-      sample = 0xFFFFFFFF;
+      for (size_t i=0; i<num_chan_out; i++) sample[i] = 0xFFFFFFFF;
 #else
-      sample = samples[index];
+      for (size_t i=0; i<num_chan_out; i++) sample[i] = samples[i];
 #endif
       t when timerafter(time + delay) :> void;
       break;
