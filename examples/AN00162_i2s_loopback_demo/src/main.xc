@@ -12,10 +12,10 @@
 #define NUM_I2S_LINES   4
 #endif
 #ifndef BURN_THREADS
-#define BURN_THREADS    0
+#define BURN_THREADS    7
 #endif
 #ifndef SAMPLE_FREQUENCY
-#define SAMPLE_FREQUENCY 192000
+#define SAMPLE_FREQUENCY 96000
 #endif
 #define MASTER_CLOCK_FREQUENCY 24576000
 
@@ -137,26 +137,61 @@ void i2s_loopback(server i2s_callback_if i2s,
 #endif
       break;
 
-/* Delay tolerance log before 192KHz broken @ 100MHz
- * Vanilla, 2ch, 192KHz - 86
- * Vanilla, 4ch, 192KHz - 32
- * Vanilla, 6ch, 192KHz - 15
- * Vanilla, 8ch, 192KHz - 6
- * HW_CLK,  2ch, 192KHz - 104
- * HW_CLK,  4ch, 192KHz - 44
- * HW_CLK,  6ch, 192KHz - 24
- * HW_CLK,  8ch, 192KHz - 14
- */
 
-/* Delay tolerance log before 192KHz broken @ 62.5MHz
-* Vanilla, 2ch, 192KHz - 4
-* Vanilla, 4ch, 192KHz - 9
-* Vanilla, 6ch, 192KHz - N/A
-* Vanilla, 8ch, 192KHz - N/A
-* HW_CLK,  2ch, 192KHz - 8
-* HW_CLK,  4ch, 192KHz - 8
-* HW_CLK,  6ch, 192KHz - 1
-* HW_CLK,  8ch, 192KHz - N/A
+/* Test results
+ * Using SW derived BCLK:
+
+SR: 96000, I2S: 1, BURN: 0, Ticks: 193
+SR: 96000, I2S: 1, BURN: 5, Ticks: 180
+SR: 96000, I2S: 1, BURN: 7, Ticks: 20
+SR: 96000, I2S: 2, BURN: 0, Ticks: 87
+SR: 96000, I2S: 2, BURN: 5, Ticks: 78
+SR: 96000, I2S: 2, BURN: 7, Ticks: 8
+SR: 96000, I2S: 3, BURN: 0, Ticks: 53
+SR: 96000, I2S: 3, BURN: 5, Ticks: 46
+SR: 96000, I2S: 3, BURN: 7, Ticks: 10
+SR: 96000, I2S: 4, BURN: 0, Ticks: 36
+SR: 96000, I2S: 4, BURN: 5, Ticks: 30
+SR: 96000, I2S: 4, BURN: 7, Ticks: 2
+SR: 192000, I2S: 1, BURN: 0, Ticks: 90
+SR: 192000, I2S: 1, BURN: 5, Ticks: 82
+SR: 192000, I2S: 1, BURN: 7, Ticks: 10
+SR: 192000, I2S: 2, BURN: 0, Ticks: 36
+SR: 192000, I2S: 2, BURN: 5, Ticks: 31
+SR: 192000, I2S: 2, BURN: 7, Ticks: 1
+SR: 192000, I2S: 3, BURN: 0, Ticks: 19
+SR: 192000, I2S: 3, BURN: 5, Ticks: 14
+SR: 192000, I2S: 3, BURN: 7, Ticks: 0
+SR: 192000, I2S: 4, BURN: 0, Ticks: 10
+SR: 192000, I2S: 4, BURN: 5, Ticks: 0
+SR: 192000, I2S: 4, BURN: 7, Ticks: 0
+
+Using HW BCLK:
+
+SR: 96000, I2S: 1, BURN: 0, Ticks: 235
+SR: 96000, I2S: 1, BURN: 5, Ticks: 204
+SR: 96000, I2S: 1, BURN: 7, Ticks: 1
+SR: 96000, I2S: 2, BURN: 0, Ticks: 112
+SR: 96000, I2S: 2, BURN: 5, Ticks: 93
+SR: 96000, I2S: 2, BURN: 7, Ticks: 2
+SR: 96000, I2S: 3, BURN: 0, Ticks: 72
+SR: 96000, I2S: 3, BURN: 5, Ticks: 66
+SR: 96000, I2S: 3, BURN: 7, Ticks: 1
+SR: 96000, I2S: 4, BURN: 0, Ticks: 51
+SR: 96000, I2S: 4, BURN: 5, Ticks: 46
+SR: 96000, I2S: 4, BURN: 7, Ticks: 3
+SR: 192000, I2S: 1, BURN: 0, Ticks: 108
+SR: 192000, I2S: 1, BURN: 5, Ticks: 87
+SR: 192000, I2S: 1, BURN: 7, Ticks: 8
+SR: 192000, I2S: 2, BURN: 0, Ticks: 47
+SR: 192000, I2S: 2, BURN: 5, Ticks: 32
+SR: 192000, I2S: 2, BURN: 7, Ticks: 8
+SR: 192000, I2S: 3, BURN: 0, Ticks: 28
+SR: 192000, I2S: 3, BURN: 5, Ticks: 15
+SR: 192000, I2S: 3, BURN: 7, Ticks: 3
+SR: 192000, I2S: 4, BURN: 0, Ticks: 18
+SR: 192000, I2S: 4, BURN: 5, Ticks: 9
+SR: 192000, I2S: 4, BURN: 7, Ticks: 0
 */
 
 
@@ -195,6 +230,7 @@ static char gpio_pin_map[4] =  {
 };
 
 #if SIM
+#define JITTER  1   //Allow for rounding so does not break when diff = period + 1
 #define DIFF_WRAP_16(new, old)  (new > old ? new - old : new + 0x10000 - old)
 on tile[0]: port p_lr_test = XS1_PORT_1A;
 unsafe void test_lr_period(void){
@@ -214,7 +250,7 @@ unsafe void test_lr_period(void){
         p_lr_test when pinseq(1) :> void @ time;
         //diff = sext(time, 16) - sext(time_old, 16);
         diff = DIFF_WRAP_16(time, time_old);
-        if (diff > period){
+        if (diff > (period + JITTER)){
             printstr("Case backpressure breaks at delay ticks=");
             printuintln(*delay_ptr);
             //printintln(diff);
