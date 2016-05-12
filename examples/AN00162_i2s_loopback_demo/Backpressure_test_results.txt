@@ -1,0 +1,105 @@
+Backpressure_test_results.txt
+ADDITIONAL_SERVER_CASE=0
+HW_DIVIDER=1
+SR: 96000, I2S: 1, BURN: 0, Ticks: 235
+SR: 96000, I2S: 1, BURN: 5, Ticks: 227
+SR: 96000, I2S: 1, BURN: 7, Ticks: 212
+SR: 96000, I2S: 2, BURN: 0, Ticks: 112
+SR: 96000, I2S: 2, BURN: 5, Ticks: 106
+SR: 96000, I2S: 2, BURN: 7, Ticks: 95
+SR: 96000, I2S: 3, BURN: 0, Ticks: 72
+SR: 96000, I2S: 3, BURN: 5, Ticks: 66
+SR: 96000, I2S: 3, BURN: 7, Ticks: 57
+SR: 96000, I2S: 4, BURN: 0, Ticks: 51
+SR: 96000, I2S: 4, BURN: 5, Ticks: 46
+SR: 96000, I2S: 4, BURN: 7, Ticks: 38
+SR: 192000, I2S: 1, BURN: 0, Ticks: 108
+SR: 192000, I2S: 1, BURN: 5, Ticks: 101
+SR: 192000, I2S: 1, BURN: 7, Ticks: 88
+SR: 192000, I2S: 2, BURN: 0, Ticks: 47
+SR: 192000, I2S: 2, BURN: 5, Ticks: 42
+SR: 192000, I2S: 2, BURN: 7, Ticks: 32
+SR: 192000, I2S: 3, BURN: 0, Ticks: 28
+SR: 192000, I2S: 3, BURN: 5, Ticks: 23
+SR: 192000, I2S: 3, BURN: 7, Ticks: 3
+SR: 192000, I2S: 4, BURN: 0, Ticks: 18
+SR: 192000, I2S: 4, BURN: 5, Ticks: 9
+SR: 192000, I2S: 4, BURN: 7, Ticks: 0
+
+HW_DIVIDER=0
+SR: 96000, I2S: 1, BURN: 0, Ticks: 193
+SR: 96000, I2S: 1, BURN: 5, Ticks: 180
+SR: 96000, I2S: 1, BURN: 7, Ticks: 155
+SR: 96000, I2S: 2, BURN: 0, Ticks: 87
+SR: 96000, I2S: 2, BURN: 5, Ticks: 78
+SR: 96000, I2S: 2, BURN: 7, Ticks: 62
+SR: 96000, I2S: 3, BURN: 0, Ticks: 53
+SR: 96000, I2S: 3, BURN: 5, Ticks: 46
+SR: 96000, I2S: 3, BURN: 7, Ticks: 33
+SR: 96000, I2S: 4, BURN: 0, Ticks: 36
+SR: 96000, I2S: 4, BURN: 5, Ticks: 30
+SR: 96000, I2S: 4, BURN: 7, Ticks: 19
+SR: 192000, I2S: 1, BURN: 0, Ticks: 90
+SR: 192000, I2S: 1, BURN: 5, Ticks: 82
+SR: 192000, I2S: 1, BURN: 7, Ticks: 68
+SR: 192000, I2S: 2, BURN: 0, Ticks: 36
+SR: 192000, I2S: 2, BURN: 5, Ticks: 31
+SR: 192000, I2S: 2, BURN: 7, Ticks: 20
+SR: 192000, I2S: 3, BURN: 0, Ticks: 19
+SR: 192000, I2S: 3, BURN: 5, Ticks: 14
+SR: 192000, I2S: 3, BURN: 7, Ticks: 0
+SR: 192000, I2S: 4, BURN: 0, Ticks: 10
+SR: 192000, I2S: 4, BURN: 5, Ticks: 0
+SR: 192000, I2S: 4, BURN: 7, Ticks: 0
+
+ADDITIONAL_SERVER_CASE=1
+HW_DIVIDER=1
+SR: 96000, I2S: 1, BURN: 0, Ticks: 198
+SR: 96000, I2S: 1, BURN: 5, Ticks: 183
+SR: 96000, I2S: 1, BURN: 7, Ticks: 153
+SR: 96000, I2S: 2, BURN: 0, Ticks: 76
+SR: 96000, I2S: 2, BURN: 5, Ticks: 62
+SR: 96000, I2S: 2, BURN: 7, Ticks: 37
+SR: 96000, I2S: 3, BURN: 0, Ticks: 37
+SR: 96000, I2S: 3, BURN: 5, Ticks: 25
+SR: 96000, I2S: 3, BURN: 7, Ticks: 1
+SR: 96000, I2S: 4, BURN: 0, Ticks: 17
+SR: 96000, I2S: 4, BURN: 5, Ticks: 1
+SR: 96000, I2S: 4, BURN: 7, Ticks: 0
+SR: 192000, I2S: 1, BURN: 0, Ticks: 72
+SR: 192000, I2S: 1, BURN: 5, Ticks: 57
+SR: 192000, I2S: 1, BURN: 7, Ticks: 30
+SR: 192000, I2S: 2, BURN: 0, Ticks: 5
+SR: 192000, I2S: 2, BURN: 5, Ticks: 0
+SR: 192000, I2S: 2, BURN: 7, Ticks: 0
+SR: 192000, I2S: 3, BURN: 0, Ticks: 0
+SR: 192000, I2S: 3, BURN: 5, Ticks: 0
+SR: 192000, I2S: 3, BURN: 7, Ticks: 0
+SR: 192000, I2S: 4, BURN: 0, Ticks: 0
+SR: 192000, I2S: 4, BURN: 5, Ticks: 0
+SR: 192000, I2S: 4, BURN: 7, Ticks: 0
+HW_DIVIDER=0
+SR: 96000, I2S: 1, BURN: 0, Ticks: 139
+SR: 96000, I2S: 1, BURN: 5, Ticks: 115
+SR: 96000, I2S: 1, BURN: 7, Ticks: 68
+SR: 96000, I2S: 2, BURN: 0, Ticks: 42
+SR: 96000, I2S: 2, BURN: 5, Ticks: 24
+SR: 96000, I2S: 2, BURN: 7, Ticks: 0
+SR: 96000, I2S: 3, BURN: 0, Ticks: 13
+SR: 96000, I2S: 3, BURN: 5, Ticks: 0
+SR: 96000, I2S: 3, BURN: 7, Ticks: 0
+SR: 96000, I2S: 4, BURN: 0, Ticks: 0
+SR: 96000, I2S: 4, BURN: 5, Ticks: 0
+SR: 96000, I2S: 4, BURN: 7, Ticks: 0
+SR: 192000, I2S: 1, BURN: 0, Ticks: 49
+SR: 192000, I2S: 1, BURN: 5, Ticks: 32
+SR: 192000, I2S: 1, BURN: 7, Ticks: 0
+SR: 192000, I2S: 2, BURN: 0, Ticks: 0
+SR: 192000, I2S: 2, BURN: 5, Ticks: 0
+SR: 192000, I2S: 2, BURN: 7, Ticks: 0
+SR: 192000, I2S: 3, BURN: 0, Ticks: 0
+SR: 192000, I2S: 3, BURN: 5, Ticks: 0
+SR: 192000, I2S: 3, BURN: 7, Ticks: 0
+SR: 192000, I2S: 4, BURN: 0, Ticks: 0
+SR: 192000, I2S: 4, BURN: 5, Ticks: 0
+SR: 192000, I2S: 4, BURN: 7, Ticks: 0

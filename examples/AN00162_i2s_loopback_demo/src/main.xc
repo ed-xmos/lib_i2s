@@ -9,15 +9,24 @@
 #include <stdlib.h>
 
 #ifndef NUM_I2S_LINES
-#define NUM_I2S_LINES   4
+#define NUM_I2S_LINES   1
 #endif
 #ifndef BURN_THREADS
 #define BURN_THREADS    7
 #endif
 #ifndef SAMPLE_FREQUENCY
-#define SAMPLE_FREQUENCY 96000
+#define SAMPLE_FREQUENCY 192000
 #endif
 #define MASTER_CLOCK_FREQUENCY 24576000
+#ifndef ADDITIONAL_SERVER_CASE
+#define ADDITIONAL_SERVER_CASE 1
+#endif
+
+#if ADDITIONAL_SERVER_CASE
+typedef interface test_serv_if{
+  void do_something(void);
+}test_serv_if;
+#endif
 
 
 /* Ports and clocks used by the application */
@@ -108,7 +117,11 @@ void i2s_loopback(server i2s_callback_if i2s,
                   client output_gpio_if dac_reset,
                   client output_gpio_if adc_reset,
                   client output_gpio_if pll_select,
-                  client output_gpio_if mclk_select)
+                  client output_gpio_if mclk_select
+#if ADDITIONAL_SERVER_CASE
+                  ,server test_serv_if i_test_serv
+#endif
+                   )
 {
   int32_t samples[8] = {0, 0, 0, 0, 0, 0, 0, 0};
   while (1) {
@@ -137,64 +150,6 @@ void i2s_loopback(server i2s_callback_if i2s,
 #endif
       break;
 
-
-/* Test results
- * Using SW derived BCLK:
-
-SR: 96000, I2S: 1, BURN: 0, Ticks: 193
-SR: 96000, I2S: 1, BURN: 5, Ticks: 180
-SR: 96000, I2S: 1, BURN: 7, Ticks: 20
-SR: 96000, I2S: 2, BURN: 0, Ticks: 87
-SR: 96000, I2S: 2, BURN: 5, Ticks: 78
-SR: 96000, I2S: 2, BURN: 7, Ticks: 8
-SR: 96000, I2S: 3, BURN: 0, Ticks: 53
-SR: 96000, I2S: 3, BURN: 5, Ticks: 46
-SR: 96000, I2S: 3, BURN: 7, Ticks: 10
-SR: 96000, I2S: 4, BURN: 0, Ticks: 36
-SR: 96000, I2S: 4, BURN: 5, Ticks: 30
-SR: 96000, I2S: 4, BURN: 7, Ticks: 2
-SR: 192000, I2S: 1, BURN: 0, Ticks: 90
-SR: 192000, I2S: 1, BURN: 5, Ticks: 82
-SR: 192000, I2S: 1, BURN: 7, Ticks: 10
-SR: 192000, I2S: 2, BURN: 0, Ticks: 36
-SR: 192000, I2S: 2, BURN: 5, Ticks: 31
-SR: 192000, I2S: 2, BURN: 7, Ticks: 1
-SR: 192000, I2S: 3, BURN: 0, Ticks: 19
-SR: 192000, I2S: 3, BURN: 5, Ticks: 14
-SR: 192000, I2S: 3, BURN: 7, Ticks: 0
-SR: 192000, I2S: 4, BURN: 0, Ticks: 10
-SR: 192000, I2S: 4, BURN: 5, Ticks: 0
-SR: 192000, I2S: 4, BURN: 7, Ticks: 0
-
-Using HW BCLK:
-
-SR: 96000, I2S: 1, BURN: 0, Ticks: 235
-SR: 96000, I2S: 1, BURN: 5, Ticks: 204
-SR: 96000, I2S: 1, BURN: 7, Ticks: 1
-SR: 96000, I2S: 2, BURN: 0, Ticks: 112
-SR: 96000, I2S: 2, BURN: 5, Ticks: 93
-SR: 96000, I2S: 2, BURN: 7, Ticks: 2
-SR: 96000, I2S: 3, BURN: 0, Ticks: 72
-SR: 96000, I2S: 3, BURN: 5, Ticks: 66
-SR: 96000, I2S: 3, BURN: 7, Ticks: 1
-SR: 96000, I2S: 4, BURN: 0, Ticks: 51
-SR: 96000, I2S: 4, BURN: 5, Ticks: 46
-SR: 96000, I2S: 4, BURN: 7, Ticks: 3
-SR: 192000, I2S: 1, BURN: 0, Ticks: 108
-SR: 192000, I2S: 1, BURN: 5, Ticks: 87
-SR: 192000, I2S: 1, BURN: 7, Ticks: 8
-SR: 192000, I2S: 2, BURN: 0, Ticks: 47
-SR: 192000, I2S: 2, BURN: 5, Ticks: 32
-SR: 192000, I2S: 2, BURN: 7, Ticks: 8
-SR: 192000, I2S: 3, BURN: 0, Ticks: 28
-SR: 192000, I2S: 3, BURN: 5, Ticks: 15
-SR: 192000, I2S: 3, BURN: 7, Ticks: 3
-SR: 192000, I2S: 4, BURN: 0, Ticks: 18
-SR: 192000, I2S: 4, BURN: 5, Ticks: 9
-SR: 192000, I2S: 4, BURN: 7, Ticks: 0
-*/
-
-
     case i2s.receive(size_t index, int32_t sample):
       timer t;
       int time;
@@ -218,6 +173,13 @@ SR: 192000, I2S: 4, BURN: 7, Ticks: 0
     case i2s.restart_check() -> i2s_restart_t restart:
       restart = I2S_NO_RESTART;
       break;
+
+#if ADDITIONAL_SERVER_CASE
+    case i_test_serv.do_something():
+      printstrln("Foo!");
+      break;
+#endif
+
     }
   }
 }
@@ -264,6 +226,12 @@ unsafe void test_lr_period(void){
 }
 #endif
 
+#if ADDITIONAL_SERVER_CASE
+void test_client_task(client test_serv_if i_test_serv){
+    while(1);
+}
+#endif
+
 void burn(void){
     while(1);
 }
@@ -273,6 +241,11 @@ int main()
   interface i2s_callback_if i_i2s;
   interface i2c_master_if i_i2c[1];
   interface output_gpio_if i_gpio[4];
+
+#if ADDITIONAL_SERVER_CASE
+  test_serv_if i_test_serv;
+#endif
+
   par {
     on tile[0]: {
       /* System setup, I2S + Codec control over I2C */
@@ -283,12 +256,20 @@ int main()
     on tile[0]: [[distribute]] output_gpio(i_gpio, 4, p_gpio, gpio_pin_map);
 
     /* The application - loopback the I2S samples */
-    on tile[0]: [[distribute]] i2s_loopback(i_i2s, i_i2c[0], i_gpio[0], i_gpio[1], i_gpio[2], i_gpio[3]);
+    on tile[0]: [[distribute]] i2s_loopback(i_i2s, i_i2c[0], i_gpio[0], i_gpio[1], i_gpio[2], i_gpio[3]
+#if ADDITIONAL_SERVER_CASE
+           ,i_test_serv);
+    on tile[0]: test_client_task(i_test_serv);
+#else
+            );
+#endif
+
+
 
 #if SIM
     on tile[0]: unsafe{test_lr_period();}
 #endif
-    on tile[0]: par (int i=0; i<(BURN_THREADS > 0 ? BURN_THREADS - SIM : 0); i++) {burn();};
+    on tile[0]: par (int i=0; i<(BURN_THREADS > 1 ? BURN_THREADS - SIM - ADDITIONAL_SERVER_CASE: 0); i++) {burn();};
   }
   return 0;
 }
