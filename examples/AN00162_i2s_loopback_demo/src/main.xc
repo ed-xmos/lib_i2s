@@ -9,7 +9,7 @@
 #include <stdlib.h>
 
 #ifndef NUM_I2S_LINES
-#define NUM_I2S_LINES   4
+#define NUM_I2S_LINES   1
 #endif
 #ifndef BURN_THREADS
 #define BURN_THREADS    0
@@ -19,7 +19,7 @@
 #endif
 #define MASTER_CLOCK_FREQUENCY 24576000
 #ifndef ADDITIONAL_SERVER_CASE
-#define ADDITIONAL_SERVER_CASE 1
+#define ADDITIONAL_SERVER_CASE 0
 #endif
 
 #if ADDITIONAL_SERVER_CASE
@@ -193,9 +193,11 @@ static char gpio_pin_map[4] =  {
 
 #if SIM
 #define JITTER  1   //Allow for rounding so does not break when diff = period + 1
+#define N_CYCLES_AT_DELAY   5 //How many LR clock cycles to measure at each backpressure delay value
 #define DIFF_WRAP_16(new, old)  (new > old ? new - old : new + 0x10000 - old)
 on tile[0]: port p_lr_test = XS1_PORT_1A;
 unsafe void test_lr_period(void){
+    int counter = 0;                //Do a number cycles at each delay value
     set_core_fast_mode_on();    //Burn all MIPS
 
     int time, time_old;
@@ -209,6 +211,11 @@ unsafe void test_lr_period(void){
     time_old = time;
     while(1){
         p_lr_test when pinseq(0) :> void;
+        counter++;
+        if (counter == N_CYCLES_AT_DELAY) {
+            (*delay_ptr)++;
+            counter = 0;
+        }
         p_lr_test when pinseq(1) :> void @ time;
         //diff = sext(time, 16) - sext(time_old, 16);
         diff = DIFF_WRAP_16(time, time_old);
@@ -217,11 +224,10 @@ unsafe void test_lr_period(void){
             printuintln(*delay_ptr);
             //printintln(diff);
             //printintln(period);
-            delay_milliseconds(1); //Let the print out
+            delay_microseconds(5); //Let the print out
             _Exit(0);
         }
         time_old = time;
-        (*delay_ptr)++;
     }
 }
 #endif
