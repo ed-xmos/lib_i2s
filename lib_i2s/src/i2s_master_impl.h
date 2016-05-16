@@ -82,7 +82,7 @@ static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
         p_dout[i] @ 2 <: 0;
     partout(p_lrclk, 1, 0);
     for(size_t i=0;i<num_in;i++)
-        asm("setpt res[%0], %1"::"r"(p_din[i]), "r"(32+1));
+        asm("setpt res[%0], %1"::"r"(p_din[i]), "r"(0 + 1));
 
     lr_mask = 0x80000000;
 
@@ -90,19 +90,8 @@ static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
     start_clock(bclk);
     p_lrclk <: lr_mask;
 
-    //Do second half of cycle
-    lr_mask = ~lr_mask;
-    p_lrclk <: lr_mask;
 
-
-    for(size_t i=0;i<num_in;i++){
-        int32_t data;
-        //asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[i]):"memory");
-    }
-    for(size_t i=0;i<num_out;i++) p_dout[i] <: 0;
-
-
-    //body
+    //body of main loop
     while(1){
 
         //Main loop
