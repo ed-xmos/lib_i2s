@@ -83,32 +83,86 @@ static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
     partout(p_lrclk, 1, 0);
     for(size_t i=0;i<num_in;i++)
         asm("setpt res[%0], %1"::"r"(p_din[i]), "r"(32+1));
+
     lr_mask = 0x80000000;
-    //Start BCLK going
-#if USE_HW_DIVIDER
+
+     //Start BCLK going
     start_clock(bclk);
-#else
-    partout(p_bclk, 1<<ratio, clk_mask);
-#endif
+    p_lrclk <: lr_mask;
+
+    //Do second half of cycle
+    lr_mask = ~lr_mask;
+    p_lrclk <: lr_mask;
 
 
-     p_lrclk <: lr_mask;
+    for(size_t i=0;i<num_in;i++){
+        int32_t data;
+        //asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[i]):"memory");
+    }
+    for(size_t i=0;i<num_out;i++) p_dout[i] <: 0;
 
-     //This is non-blocking
-     lr_mask = ~lr_mask;
-     p_lrclk <: lr_mask;
-
-     //Now preload word 1
-     unsigned if_call_num = 0;
-     for(size_t i=0;i<num_out;i++)
-         p_dout[if_call_num] <: 0;
 
     //body
     while(1){
-        // Do the first (FRAME_WORDS-1) words of the frame
+
+        //Main loop
+        size_t idx;
+
+        lr_mask = ~lr_mask;
+        p_lrclk <: lr_mask;
+
+        //Input i2s evens
+        idx = 0;
+#pragma loop unroll
+        for(size_t i=0;i<num_in;i++){
+            int32_t data;
+            asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[i]):"memory");
+            in_samps[idx] = bitrev(data);
+            idx+=2;
+        }
+
+
+        //output i2s evens
+        idx = 0;
+#pragma loop unroll
+        for(size_t i=0;i<num_out;i++){
+            p_dout[i] <: bitrev(out_samps[idx]);
+            idx+=2;
+        }
+
+
+        //This will block and from here on spill into next frame
+        lr_mask = ~lr_mask;
+        p_lrclk <: lr_mask;
+
+        //Input i2s odds
+        idx = 1;
+#pragma loop unroll
+        for(size_t i=0;i<num_in;i++){
+            int32_t data;
+            asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[i]):"memory");
+            in_samps[idx] = bitrev(data);
+            idx+=2;
+        }
+
+        //output i2s odds
+        idx = 1;
+#pragma loop unroll
+        for(size_t i=0;i<num_out;i++){
+            p_dout[i] <: bitrev(out_samps[idx]);
+            idx+=2;
+        }
+
+
+        //transfer output samps
+        i2s_i.send(num_out << 1, out_samps);
+
+        //transfer input samps
+        i2s_i.receive(num_in << 1, in_samps);
+
+        // Check for restart
         i2s_restart_t restart = i2s_i.restart_check();
 
-        // The final word of each frame is special as it might terminate the transfer
         if (restart != I2S_NO_RESTART) {
             fail("Not yet implemented");
 #if !USE_HW_DIVIDER
@@ -116,54 +170,6 @@ static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
 #endif
             return restart;
         }
-        size_t idx;
-
-
-        //Main loop
-        lr_mask = ~lr_mask;
-        p_lrclk <: lr_mask;
-
-        //Input i2s odds
-        idx = 1;
-        for(size_t i=0;i<num_in;i++){
-            int32_t data;
-            asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[i]):"memory");
-            in_samps[idx] = bitrev(data);
-            idx+=2;
-        }
-
-        //transfer output samps
-        i2s_i.send(num_out << 1, out_samps);
-
-        //output i2s odds
-        idx = 1;
-        for(size_t i=0;i<num_out;i++){
-            p_dout[i] <: bitrev(out_samps[idx]);
-            idx+=2;
-        }
-
-        lr_mask = ~lr_mask;
-        p_lrclk <: lr_mask;
-
-        //Input i2s evens
-        idx = 0;
-        for(size_t i=0;i<num_in;i++){
-            int32_t data;
-            asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[i]):"memory");
-            in_samps[idx] = bitrev(data);
-            idx+=2;
-        }
-
-        //transfer input samps
-        i2s_i.receive(num_in << 1, in_samps);
-
-        //output i2s evens
-        idx = 0;
-        for(size_t i=0;i<num_out;i++){
-            p_dout[i] <: bitrev(out_samps[idx]);
-            idx+=2;
-        }
-
 
     }
     return I2S_RESTART;

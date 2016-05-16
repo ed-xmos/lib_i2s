@@ -9,17 +9,17 @@
 #include <stdlib.h>
 
 #ifndef NUM_I2S_LINES
-#define NUM_I2S_LINES   1
+#define NUM_I2S_LINES   2
 #endif
 #ifndef BURN_THREADS
-#define BURN_THREADS    0
+#define BURN_THREADS    7
 #endif
 #ifndef SAMPLE_FREQUENCY
 #define SAMPLE_FREQUENCY 192000
 #endif
 #define MASTER_CLOCK_FREQUENCY 24576000
 #ifndef ADDITIONAL_SERVER_CASE
-#define ADDITIONAL_SERVER_CASE 0
+#define ADDITIONAL_SERVER_CASE 1
 #endif
 
 #if ADDITIONAL_SERVER_CASE
