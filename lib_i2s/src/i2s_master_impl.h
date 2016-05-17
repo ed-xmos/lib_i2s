@@ -76,8 +76,8 @@ static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
     clearbuf(p_lrclk);
 
 
-    //Preload word 0
-
+    //Preload word 0 - send zeros for first half frame
+    i2s_i.send(num_out << 1, out_samps);
     for(size_t i=0;i<num_out;i++)
         p_dout[i] @ 2 <: 0;
     partout(p_lrclk, 1, 0);
@@ -86,7 +86,7 @@ static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
 
     lr_mask = 0x80000000;
 
-     //Start BCLK going
+    //Start BCLK going
     start_clock(bclk);
     p_lrclk <: lr_mask;
 
@@ -120,7 +120,7 @@ static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
         }
 
 
-        //This will block and from here on spill into next frame
+        //This will block and from here on I/O will spill into next frame
         lr_mask = ~lr_mask;
         p_lrclk <: lr_mask;
 

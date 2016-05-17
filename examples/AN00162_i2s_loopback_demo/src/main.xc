@@ -12,14 +12,18 @@
 #define NUM_I2S_LINES   2
 #endif
 #ifndef BURN_THREADS
-#define BURN_THREADS    7
+#define BURN_THREADS    0
 #endif
 #ifndef SAMPLE_FREQUENCY
-#define SAMPLE_FREQUENCY 192000
+#define SAMPLE_FREQUENCY 48000
 #endif
 #define MASTER_CLOCK_FREQUENCY 24576000
 #ifndef ADDITIONAL_SERVER_CASE
-#define ADDITIONAL_SERVER_CASE 1
+#define ADDITIONAL_SERVER_CASE 0
+#endif
+
+#ifndef SIM_SIM_LOOPBACK_TEST
+#define SIM_LOOPBACK_TEST 1
 #endif
 
 #if ADDITIONAL_SERVER_CASE
@@ -124,6 +128,11 @@ void i2s_loopback(server i2s_callback_if i2s,
                    )
 {
   int32_t samples[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+#if SIM_LOOPBACK_TEST
+  int32_t tx_data = 0;
+  int32_t rx_data = -1; //Need to start one frame later
+#endif
+
   while (1) {
     select {
     case i2s.init(i2s_config_t &?i2s_config, tdm_config_t &?tdm_config):
@@ -154,7 +163,20 @@ void i2s_loopback(server i2s_callback_if i2s,
       timer t;
       int time;
       t :> time;
-      for (size_t i=0; i<num_chan_in; i++) samples[i] = sample[i];
+#if SIM_LOOPBACK_TEST
+      if(rx_data >= 0){
+          for (size_t i=0; i<num_chan_in; i++) {
+              samples[i] = sample[i];
+              assert(sample[i] == (rx_data << 16) + i);
+          }
+      }
+      rx_data++;
+#else
+      for (size_t i=0; i<num_chan_in; i++) {
+          samples[i] = sample[i];
+      }
+#endif
+
       t when timerafter(time + delay) :> void;
       break;
 
@@ -163,7 +185,16 @@ void i2s_loopback(server i2s_callback_if i2s,
       int time;
       t :> time;
 #if SIM
-      for (size_t i=0; i<num_chan_out; i++) sample[i] = 0xFFFFFFFF;
+      for (size_t i=0; i<num_chan_out; i++)
+#if SIM_LOOPBACK_TEST
+      {
+          sample[i] = (tx_data << 16) + i;
+      }
+      tx_data++;
+#else
+      sample[i] = 0xFFFFFFFF;
+#endif
+
 #else
       for (size_t i=0; i<num_chan_out; i++) sample[i] = samples[i];
 #endif
@@ -193,7 +224,7 @@ static char gpio_pin_map[4] =  {
 
 #if SIM
 #define JITTER  1   //Allow for rounding so does not break when diff = period + 1
-#define N_CYCLES_AT_DELAY   5 //How many LR clock cycles to measure at each backpressure delay value
+#define N_CYCLES_AT_DELAY   1 //How many LR clock cycles to measure at each backpressure delay value
 #define DIFF_WRAP_16(new, old)  (new > old ? new - old : new + 0x10000 - old)
 on tile[0]: port p_lr_test = XS1_PORT_1A;
 unsafe void test_lr_period(void){
