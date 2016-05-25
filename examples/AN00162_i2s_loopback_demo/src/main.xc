@@ -15,7 +15,7 @@
 #define BURN_THREADS    0
 #endif
 #ifndef SAMPLE_FREQUENCY
-#define SAMPLE_FREQUENCY 48000
+#define SAMPLE_FREQUENCY 12000
 #endif
 #define MASTER_CLOCK_FREQUENCY 24576000
 #ifndef ADDITIONAL_SERVER_CASE
@@ -130,7 +130,7 @@ void i2s_loopback(server i2s_callback_if i2s,
   int32_t samples[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 #if SIM_LOOPBACK_TEST
   int32_t tx_data = 0;
-  int32_t rx_data = -1; //Need to start one frame later
+  int32_t rx_data = 0; //Need to start one frame later
 #endif
 
   while (1) {
@@ -167,6 +167,7 @@ void i2s_loopback(server i2s_callback_if i2s,
       if(rx_data >= 0){
           for (size_t i=0; i<num_chan_in; i++) {
               samples[i] = sample[i];
+              //debug_printf("r%x\n", sample[i]);
               assert(sample[i] == (rx_data << 16) + i);
           }
       }
@@ -189,6 +190,8 @@ void i2s_loopback(server i2s_callback_if i2s,
 #if SIM_LOOPBACK_TEST
       {
           sample[i] = (tx_data << 16) + i;
+          //debug_printf("s%x\n", sample[i]);
+
       }
       tx_data++;
 #else
@@ -196,7 +199,9 @@ void i2s_loopback(server i2s_callback_if i2s,
 #endif
 
 #else
-      for (size_t i=0; i<num_chan_out; i++) sample[i] = samples[i];
+      for (size_t i=0; i<num_chan_out; i++) {
+          sample[i] = samples[i];
+      }
 #endif
       t when timerafter(time + delay) :> void;
       break;

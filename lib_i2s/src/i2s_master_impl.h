@@ -67,6 +67,8 @@ static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
     int32_t in_samps[8]; //Temp hack. should be num_in << 1 but compiler thinks that isn't const
     int32_t out_samps[8];
 
+    size_t idx;
+
     unsigned lr_mask = 0;
 
     for(size_t i=0;i<num_out;i++)
@@ -77,25 +79,69 @@ static i2s_restart_t i2s_ratio_n(client i2s_callback_if i2s_i,
 
 
     //Preload word 0 - send zeros for first half frame
-    i2s_i.send(num_out << 1, out_samps);
     for(size_t i=0;i<num_out;i++)
-        p_dout[i] @ 2 <: 0;
+        p_dout[i] @ 2 <: 0xAA;
     partout(p_lrclk, 1, 0);
     for(size_t i=0;i<num_in;i++)
         asm("setpt res[%0], %1"::"r"(p_din[i]), "r"(0 + 1));
 
     lr_mask = 0x80000000;
 
+    //Get initial output samps
+    i2s_i.send(num_out << 1, out_samps);
+
     //Start BCLK going
     start_clock(bclk);
     p_lrclk <: lr_mask;
 
+    //initial loop without inputs, so that frames are aligned
+    lr_mask = ~lr_mask;
+    p_lrclk <: lr_mask;
+
+    //Input i2s evens and discard
+    idx = 0;
+#pragma loop unroll
+    for(size_t i=0;i<num_in;i++){
+        int32_t data;
+        asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[i]):"memory");
+    }
+
+
+    //output i2s evens
+    idx = 0;
+#pragma loop unroll
+    for(size_t i=0;i<num_out;i++){
+        p_dout[i] <: bitrev(out_samps[idx]);
+        idx+=2;
+    }
+
+
+    lr_mask = ~lr_mask;
+    p_lrclk <: lr_mask;
+
+    //Input i2s odds and discard
+#pragma loop unroll
+    for(size_t i=0;i<num_in;i++){
+        int32_t data;
+        asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[i]):"memory");
+    }
+
+    //output i2s odds
+    idx = 1;
+#pragma loop unroll
+    for(size_t i=0;i<num_out;i++){
+        p_dout[i] <: bitrev(out_samps[idx]);
+        idx+=2;
+    }
+
+    //Get next output samps
+    i2s_i.send(num_out << 1, out_samps);
 
     //body of main loop
     while(1){
 
         //Main loop
-        size_t idx;
+
 
         lr_mask = ~lr_mask;
         p_lrclk <: lr_mask;
@@ -177,7 +223,7 @@ static void i2s_master0(client i2s_callback_if i2s_i,
                 clock bclk,
                 clock mclk){
     while(1){
-        debug_printf("config.mclk_bclk_ratio=%d\n",config.mclk_bclk_ratio);
+        //debug_printf("config.mclk_bclk_ratio=%d\n",config.mclk_bclk_ratio);
 
 #if !USE_HW_DIVIDER
 #if SIM
