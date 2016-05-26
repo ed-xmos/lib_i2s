@@ -15,15 +15,15 @@
 #define BURN_THREADS    0
 #endif
 #ifndef SAMPLE_FREQUENCY
-#define SAMPLE_FREQUENCY 12000
+#define SAMPLE_FREQUENCY 768000
 #endif
-#define MASTER_CLOCK_FREQUENCY 24576000
+#define MASTER_CLOCK_FREQUENCY 49152000
 #ifndef ADDITIONAL_SERVER_CASE
 #define ADDITIONAL_SERVER_CASE 0
 #endif
 
 #ifndef SIM_SIM_LOOPBACK_TEST
-#define SIM_LOOPBACK_TEST 1
+#define SIM_LOOPBACK_TEST 0
 #endif
 
 #if ADDITIONAL_SERVER_CASE
@@ -138,6 +138,7 @@ void i2s_loopback(server i2s_callback_if i2s,
     case i2s.init(i2s_config_t &?i2s_config, tdm_config_t &?tdm_config):
       i2s_config.mode = I2S_MODE_I2S;
       i2s_config.mclk_bclk_ratio = (MASTER_CLOCK_FREQUENCY/SAMPLE_FREQUENCY)/64;
+      //debug_printf("i2s_config.mclk_bclk_ratio=%d\n",i2s_config.mclk_bclk_ratio);
 
 #if !SIM
       // Set CODECs in reset
@@ -229,7 +230,7 @@ static char gpio_pin_map[4] =  {
 
 #if SIM
 #define JITTER  1   //Allow for rounding so does not break when diff = period + 1
-#define N_CYCLES_AT_DELAY   1 //How many LR clock cycles to measure at each backpressure delay value
+#define N_CYCLES_AT_DELAY   3 //How many LR clock cycles to measure at each backpressure delay value
 #define DIFF_WRAP_16(new, old)  (new > old ? new - old : new + 0x10000 - old)
 on tile[0]: port p_lr_test = XS1_PORT_1A;
 unsafe void test_lr_period(void){
