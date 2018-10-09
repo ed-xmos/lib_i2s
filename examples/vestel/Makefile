@@ -9,14 +9,14 @@ TARGET = XR-AUDIO-216-MC
 APP_NAME = 
 
 # The USED_MODULES variable lists other module used by the application.
-USED_MODULES = lib_gpio(>=1.1.0) lib_i2c(>=5.0.0) lib_i2s(>=2.4.0)
+USED_MODULES = lib_gpio(>=1.1.0) lib_i2c(>=5.0.0) lib_i2s(>=2.4.0) lib_spdif
 
 # The flags passed to xcc when building the application
 # You can also set the following to override flags for a particular language:
 # XCC_XC_FLAGS, XCC_C_FLAGS, XCC_ASM_FLAGS, XCC_CPP_FLAGS
 # If the variable XCC_MAP_FLAGS is set it overrides the flags passed to
 # xcc for the final link (mapping) stage.
-XCC_FLAGS = $(EXTRA_FLAGS) -O3 -report -g -DSIM_LOOPBACK_TEST=1 -DDEBUG_PRINT_ENABLE=1 -D N_BITS=24
+XCC_FLAGS = $(EXTRA_FLAGS) -O3 -report -g -DSIM_LOOPBACK_TEST=0 -DDEBUG_PRINT_ENABLE=1 -D N_BITS=24 -D SPDIF_RX_CHANS=2
 
 # The VERBOSE variable, if set to 1, enables verbose output from the make system.
 VERBOSE = 0

@@ -8,14 +8,18 @@
 #include <stdlib.h>
 #include <debug_print.h>
 #include <string.h>
+#include <xscope.h>
+#include "spdif.h"
+#include "spdif_buff.h"
+
 
 #define TEST_LENGTH     8 //Number of I2S frames to check
 
 #ifndef NUM_I2S_LINES
-#define NUM_I2S_LINES   4
+#define NUM_I2S_LINES   1
 #endif
 #ifndef SAMPLE_FREQUENCY
-#define SAMPLE_FREQUENCY 192000
+#define SAMPLE_FREQUENCY 48000
 #endif
 #ifndef MASTER_CLOCK_FREQUENCY
 #define MASTER_CLOCK_FREQUENCY 24576000
@@ -35,6 +39,10 @@ on tile[0]: clock clk_bclk = XS1_CLKBLK_2;
 
 on tile[0]: port p_i2c = XS1_PORT_4A;
 on tile[0]: port p_gpio = XS1_PORT_8C;
+
+on tile[1]: in port p_spdif = XS1_PORT_1O; //Optical in
+on tile[1]: clock spdif_clk = XS1_CLKBLK_4;
+
 
 enum gpio_shared_audio_pins {
   GPIO_DAC_RST_N = 1,
@@ -161,11 +169,14 @@ void i2s_handler(server i2s_frame_callback_if i_i2s, client i2c_master_if i_i2c,
                  client output_gpio_if dac_reset,
                  client output_gpio_if adc_reset,
                  client output_gpio_if pll_select,
-                 client output_gpio_if mclk_select)
+                 client output_gpio_if mclk_select,
+                 streaming chanend c_i2s)
 {
   int32_t tx_data = 0xf00faa00; //Seed
   int32_t rx_data = 0xf00faa00; //Seed 
   uint32_t cycle_count = 0;
+
+  unsigned i2s_sample_count = 0;
 
   int32_t loopback[NUM_I2S_LINES * 2] = {0};
 
@@ -186,22 +197,6 @@ void i2s_handler(server i2s_frame_callback_if i_i2s, client i2c_master_if i_i2c,
         // Set CODECs in reset
         dac_reset.output(0);
         adc_reset.output(0);
-
-        // Select 48Khz family clock (24.576Mhz)
-        mclk_select.output(1);
-        pll_select.output(0);
-
-        // Allow the clock to settle
-        delay_milliseconds(2);
-
-        // Take CODECs out of reset
-        dac_reset.output(1);
-        adc_reset.output(1);
-
-        reset_codecs(i_i2c);
-        debug_printf("Initialse I2S on hardware\n");
-        delay_milliseconds(500); //Allow print to complete
-
       }
       break;
 
@@ -241,23 +236,63 @@ void i2s_handler(server i2s_frame_callback_if i_i2s, client i2c_master_if i_i2c,
       else{
         memcpy(sample, loopback, num_chan_out * sizeof(int32_t));
       }
+      xscope_int(0, sample[0]);
+      //debug_printf("%d\n", sample[0]);
       //delay_microseconds(19);
       break;
 
     case i_i2s.restart_check() -> i2s_restart_t restart:
       restart = I2S_NO_RESTART;
       //delay_microseconds(1);
+      i2s_sample_count ++;
+      c_i2s <: i2s_sample_count;
       break;
     }
   }
 }
 
 
+void rate_handler_tile0(streaming chanend c_spdif, streaming chanend c_i2s){
+  timer t;
+  unsigned trig;
+  t :> trig;
+
+  const unsigned period = 1000000000;
+  trig += period;
+
+  unsigned count_spdif_now = 0;
+  unsigned count_i2s_now = 0;
+
+  unsigned count_spdif_last = 0;
+  unsigned count_i2s_last = 0;
+
+  while(1){
+    select{
+    case c_spdif :> count_spdif_now:
+      break;
+
+    case c_i2s :> count_i2s_now:
+      break;
+
+    case t when timerafter(trig) :> int _:
+      trig += period;
+      debug_printf("SPDIF: %d I2S: %d\n", count_spdif_now - count_spdif_last, count_i2s_now - count_i2s_last);
+      count_spdif_last = count_spdif_now;
+      count_i2s_last = count_i2s_now;
+      break;
+    }
+  }
+}
+
 int main()
 {
   interface i2s_frame_callback_if i_i2s_slave;
   interface i2c_master_if i_i2c[1];
   interface output_gpio_if i_gpio[4];
+
+  streaming chan c_spdif;
+  streaming chan c_spdif_rx;
+  streaming chan c_i2s;
 
 
   par {
@@ -270,9 +305,16 @@ int main()
     on tile[0]: [[distribute]] output_gpio(i_gpio, 4, p_gpio, gpio_pin_map);
 
     /* The application - loopback the I2S samples */
-    on tile[0]: [[distribute]] i2s_handler(i_i2s_slave, i_i2c[0], i_gpio[0], i_gpio[1], i_gpio[2], i_gpio[3]);
+    on tile[0]: [[distribute]] i2s_handler(i_i2s_slave, i_i2c[0], i_gpio[0], i_gpio[1], i_gpio[2], i_gpio[3], c_i2s);
 
-    on tile[0]: par (int i=0; i<7; i++) while(1); //Burn threads to restrict i2s to 62.5MIPS
+    on tile[1]: rate_handler_tile0(c_spdif, c_i2s);
+
+    on tile[0]: par (int i=0; i<6; i++) while(1); //Burn threads to restrict i2s to 62.5MIPS
+
+
+    on tile[1]: spdif_rx(c_spdif_rx, p_spdif, spdif_clk, SAMPLE_FREQUENCY);
+    on tile[1]: spdif_rx_buffer(c_spdif, c_spdif_rx);
+
   } 
   return 0;
 }
