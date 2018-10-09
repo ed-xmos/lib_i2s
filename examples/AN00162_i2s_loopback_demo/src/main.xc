@@ -97,7 +97,7 @@ void i2s_loopback(server i2s_frame_callback_if i2s,
     select {
     case i2s.init(i2s_config_t &?i2s_config, tdm_config_t &?tdm_config):
       i2s_config.mode = I2S_MODE_I2S;
-      i2s_config.mclk_bclk_ratio = (MASTER_CLOCK_FREQUENCY/SAMPLE_FREQUENCY)/64;
+      i2s_config.mclk_bclk_ratio = (MASTER_CLOCK_FREQUENCY/SAMPLE_FREQUENCY)/(N_BITS * 2);
 
       // Set CODECs in reset
       dac_reset.output(0);
@@ -119,10 +119,15 @@ void i2s_loopback(server i2s_frame_callback_if i2s,
 
     case i2s.receive(size_t n_chans, int32_t in_samps[n_chans]):
     for (int i = 0; i < n_chans; i++) samples[i] = in_samps[i]; // copy samples
+      printhexln(in_samps[0]);
       break;
 
     case i2s.send(size_t n_chans, int32_t out_samps[n_chans]):
       for (int i = 0; i < n_chans; i++) out_samps[i] = samples[i]; // copy samples
+      out_samps[0] = 0x12345678;
+      //out_samps[0] = 0xf0aaaaaa;
+      out_samps[1] = 0x00000000;
+     
       break;
 
     case i2s.restart_check() -> i2s_restart_t restart:

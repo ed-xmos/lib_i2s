@@ -389,6 +389,5 @@ void i2s_tdm_master(client interface i2s_callback_if tdm_i,
 #include <i2s_slave_impl.h>
 #include <i2s_frame_slave_impl.h>
 #include <tdm_master_impl.h>
-#include <i2s_tdm_master_impl.h>
 
 #endif // _i2s_h_

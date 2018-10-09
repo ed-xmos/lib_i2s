@@ -16,7 +16,8 @@ USED_MODULES = lib_gpio(>=1.1.0) lib_i2c(>=4.0.0) lib_i2s(>=2.2.0)
 # XCC_XC_FLAGS, XCC_C_FLAGS, XCC_ASM_FLAGS, XCC_CPP_FLAGS
 # If the variable XCC_MAP_FLAGS is set it overrides the flags passed to
 # xcc for the final link (mapping) stage.
-XCC_FLAGS = $(EXTRA_FLAGS) -O2 -report -g -DSIM_LOOPBACK_TEST=1 -DDEBUG_PRINT_ENABLE=1
+XCC_FLAGS = $(EXTRA_FLAGS) -O2 -report -g -DSIM_LOOPBACK_TEST=1 -DDEBUG_PRINT_ENABLE=1 -D N_BITS=24
+
 
 # The VERBOSE variable, if set to 1, enables verbose output from the make system.
 VERBOSE = 0

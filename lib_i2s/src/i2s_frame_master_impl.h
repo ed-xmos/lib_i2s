@@ -63,24 +63,29 @@ static i2s_restart_t i2s_frame_ratio_n(client i2s_frame_callback_if i2s_i,
 
 #pragma loop unroll
     for (size_t i=0, idx=0; i<num_out; i++, idx+=2){
-        p_dout[i] @ (1 + offset) <: bitrev(out_samps[idx]);
+        //p_dout[i] @ (1 + offset) <: bitrev(out_samps[idx]);
+        partout_timed(p_dout[i], N_BITS, bitrev(out_samps[idx]), (1 + offset));
     }
 
-    p_lrclk @ 1 <: lr_mask;
+    //p_lrclk @ 1 <: lr_mask;
+    partout_timed(p_lrclk, N_BITS, lr_mask, 1);
 
     start_clock(bclk);
 
     //And pre-load the odds (1,3,5..)
 #pragma loop unroll
     for (size_t i=0, idx=1; i<num_out; i++, idx+=2){
-        p_dout[i] <: bitrev(out_samps[idx]);
+        //p_dout[i] <: bitrev(out_samps[idx]);
+        partout(p_dout[i], N_BITS, bitrev(out_samps[idx]));
     }
 
     lr_mask = ~lr_mask;
-    p_lrclk <: lr_mask;
+    //p_lrclk <: lr_mask;
+    partout(p_lrclk, N_BITS, lr_mask);
 
     for (size_t i=0;i<num_in;i++) {
-        asm("setpt res[%0], %1"::"r"(p_din[i]), "r"(32 + offset));
+        asm("setpt res[%0], %1"::"r"(p_din[i]), "r"(N_BITS + offset));
+        set_port_shift_count(p_din[i], N_BITS);
     }
 
     while(1) {
@@ -93,7 +98,8 @@ static i2s_restart_t i2s_frame_ratio_n(client i2s_frame_callback_if i2s_i,
             //Output i2s evens (0,2,4..)
 #pragma loop unroll
             for (size_t i=0, idx=0; i<num_out; i++, idx+=2){
-                p_dout[i] <: bitrev(out_samps[idx]);
+                //p_dout[i] <: bitrev(out_samps[idx]);
+                partout(p_dout[i], N_BITS, bitrev(out_samps[idx]));
             }
         }
 
@@ -102,21 +108,25 @@ static i2s_restart_t i2s_frame_ratio_n(client i2s_frame_callback_if i2s_i,
         for (size_t i=0, idx=0; i<num_in; i++, idx+=2){
             int32_t data;
             asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[i]):"memory");
-            in_samps[idx] = bitrev(data);
+            set_port_shift_count(p_din[i], N_BITS);
+            in_samps[idx] = bitrev(data) << (32 - N_BITS);
         }
 
         lr_mask = ~lr_mask;
-        p_lrclk <: lr_mask;
+        //p_lrclk <: lr_mask;
+        partout(p_lrclk, N_BITS, lr_mask);
 
         if (restart == I2S_NO_RESTART) {
             //Output i2s odds (1,3,5..)
 #pragma loop unroll
             for (size_t i=0, idx=1; i<num_out; i++, idx+=2){
-                p_dout[i] <: bitrev(out_samps[idx]);
+                //p_dout[i] <: bitrev(out_samps[idx]);
+                partout(p_dout[i], N_BITS, bitrev(out_samps[idx]));
             }
 
             lr_mask = ~lr_mask;
-            p_lrclk <: lr_mask;
+            //p_lrclk <: lr_mask;
+            partout(p_lrclk, N_BITS, lr_mask);
         }
 
         //Input i2s odds (1,3,5..)
@@ -124,7 +134,8 @@ static i2s_restart_t i2s_frame_ratio_n(client i2s_frame_callback_if i2s_i,
         for (size_t i=0, idx=1; i<num_in; i++, idx+=2){
             int32_t data;
             asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[i]):"memory");
-            in_samps[idx] = bitrev(data);
+            set_port_shift_count(p_din[i], N_BITS);
+            in_samps[idx] = bitrev(data) << (32 - N_BITS);
         }
 
         if (num_in) i2s_i.receive(num_in << 1, in_samps);
