@@ -177,7 +177,7 @@ typedef interface i2s_frame_callback_if {
 } i2s_frame_callback_if;
 
 /** I2S master component.
- *  PLEASE USE i2s_frame_master instead, which is more efficient
+ *  DEPRECATED - PLEASE USE i2s_frame_master instead, which is more efficient
  *
  *  This task performs I2S on the provided pins. It will perform callbacks over
  *  the i2s_callback_if interface to get/receive data from the application
@@ -200,7 +200,7 @@ typedef interface i2s_frame_callback_if {
  *                        Usually this should be configured to be driven by
  *                        an incoming master system clock.
  */
-__attribute__((deprecated)) void i2s_master(client i2s_callback_if i2s_i,
+void i2s_master(client i2s_callback_if i2s_i,
                 out buffered port:32 (&?p_dout)[num_out],
                 static const size_t num_out,
                 in buffered port:32 (&?p_din)[num_in],
@@ -253,7 +253,7 @@ void i2s_frame_master(client i2s_frame_callback_if i2s_i,
 #endif // __XS2A__
 
 /** I2S slave component.
- *  PLEASE USE i2s_frame_slave instead, which is more efficient
+ *  DEPRECATED - PLEASE USE i2s_frame_slave instead, which is more efficient
  *
  *  This task performs I2S on the provided pins. It will perform callbacks over
  *  the i2s_callback_if interface to get/receive data from the application
@@ -273,7 +273,7 @@ void i2s_frame_master(client i2s_frame_callback_if i2s_i,
  *  \param bclk           A clock that will get configured for use with
  *                        the bit clock
  */
-__attribute__((deprecated)) void i2s_slave(client i2s_callback_if i2s_i,
+void i2s_slave(client i2s_callback_if i2s_i,
         out buffered port:32 (&?p_dout)[num_out],
         static const size_t num_out,
         in buffered port:32 (&?p_din)[num_in],
