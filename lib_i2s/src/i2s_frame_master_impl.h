@@ -35,6 +35,7 @@ static i2s_restart_t i2s_frame_ratio_n(client i2s_frame_callback_if i2s_i,
         static const size_t num_out,
         in buffered port:32 (&?p_din)[num_in],
         static const size_t num_in,
+        static const size_t num_data_bits,
         out port p_bclk,
         clock bclk,
         out buffered port:32 p_lrclk,
@@ -66,11 +67,11 @@ static i2s_restart_t i2s_frame_ratio_n(client i2s_frame_callback_if i2s_i,
 #pragma loop unroll
     for (size_t i=0, idx=0; i<num_out; i++, idx+=2){
         //p_dout[i] @ (1 + offset) <: bitrev(out_samps[idx]);
-        partout_timed(p_dout[i], N_BITS, bitrev(out_samps[idx]), (1 + offset));
+        partout_timed(p_dout[i], num_data_bits, bitrev(out_samps[idx]), (1 + offset));
     }
 
     //p_lrclk @ 1 <: lr_mask;
-    partout_timed(p_lrclk, N_BITS, lr_mask, 1);
+    partout_timed(p_lrclk, num_data_bits, lr_mask, 1);
 
     start_clock(bclk);
 
@@ -78,16 +79,16 @@ static i2s_restart_t i2s_frame_ratio_n(client i2s_frame_callback_if i2s_i,
 #pragma loop unroll
     for (size_t i=0, idx=1; i<num_out; i++, idx+=2){
         //p_dout[i] <: bitrev(out_samps[idx]);
-        partout(p_dout[i], N_BITS, bitrev(out_samps[idx]));
+        partout(p_dout[i], num_data_bits, bitrev(out_samps[idx]));
     }
 
     lr_mask = ~lr_mask;
     //p_lrclk <: lr_mask;
-    partout(p_lrclk, N_BITS, lr_mask);
+    partout(p_lrclk, num_data_bits, lr_mask);
 
     for (size_t i=0;i<num_in;i++) {
-        asm("setpt res[%0], %1"::"r"(p_din[i]), "r"(N_BITS + offset));
-        set_port_shift_count(p_din[i], N_BITS);
+        asm("setpt res[%0], %1"::"r"(p_din[i]), "r"(num_data_bits + offset));
+        set_port_shift_count(p_din[i], num_data_bits);
     }
 
     while(1) {
@@ -101,7 +102,7 @@ static i2s_restart_t i2s_frame_ratio_n(client i2s_frame_callback_if i2s_i,
 #pragma loop unroll
             for (size_t i=0, idx=0; i<num_out; i++, idx+=2){
                 //p_dout[i] <: bitrev(out_samps[idx]);
-                partout(p_dout[i], N_BITS, bitrev(out_samps[idx]));
+                partout(p_dout[i], num_data_bits, bitrev(out_samps[idx]));
             }
         }
 
@@ -110,25 +111,25 @@ static i2s_restart_t i2s_frame_ratio_n(client i2s_frame_callback_if i2s_i,
         for (size_t i=0, idx=0; i<num_in; i++, idx+=2){
             int32_t data;
             asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[i]):"memory");
-            set_port_shift_count(p_din[i], N_BITS);
-            in_samps[idx] = bitrev(data) << (32 - N_BITS);
+            set_port_shift_count(p_din[i], num_data_bits);
+            in_samps[idx] = bitrev(data) << (32 - num_data_bits);
         }
 
         lr_mask = ~lr_mask;
         //p_lrclk <: lr_mask;
-        partout(p_lrclk, N_BITS, lr_mask);
+        partout(p_lrclk, num_data_bits, lr_mask);
 
         if (restart == I2S_NO_RESTART) {
             //Output i2s odds (1,3,5..)
 #pragma loop unroll
             for (size_t i=0, idx=1; i<num_out; i++, idx+=2){
                 //p_dout[i] <: bitrev(out_samps[idx]);
-                partout(p_dout[i], N_BITS, bitrev(out_samps[idx]));
+                partout(p_dout[i], num_data_bits, bitrev(out_samps[idx]));
             }
 
             lr_mask = ~lr_mask;
             //p_lrclk <: lr_mask;
-            partout(p_lrclk, N_BITS, lr_mask);
+            partout(p_lrclk, num_data_bits, lr_mask);
         }
 
         //Input i2s odds (1,3,5..)
@@ -136,8 +137,8 @@ static i2s_restart_t i2s_frame_ratio_n(client i2s_frame_callback_if i2s_i,
         for (size_t i=0, idx=1; i<num_in; i++, idx+=2){
             int32_t data;
             asm volatile("in %0, res[%1]":"=r"(data):"r"(p_din[i]):"memory");
-            set_port_shift_count(p_din[i], N_BITS);
-            in_samps[idx] = bitrev(data) << (32 - N_BITS);
+            set_port_shift_count(p_din[i], num_data_bits);
+            in_samps[idx] = bitrev(data) << (32 - num_data_bits);
         }
 
         if (num_in) i2s_i.receive(num_in << 1, in_samps);
@@ -162,6 +163,7 @@ static void i2s_frame_master0(client i2s_frame_callback_if i2s_i,
                 static const size_t num_out,
                 in buffered port:32 (&?p_din)[num_in],
                 static const size_t num_in,
+                static const size_t num_data_bits,
                 out port p_bclk,
                 out buffered port:32 p_lrclk,
                 in port p_mclk,
@@ -182,7 +184,7 @@ static void i2s_frame_master0(client i2s_frame_callback_if i2s_i,
             p_mclk, config.mclk_bclk_ratio);
 
         i2s_restart_t restart =
-          i2s_frame_ratio_n(i2s_i, p_dout, num_out, p_din,
+          i2s_frame_ratio_n(i2s_i, p_dout, num_out, p_din, num_data_bits,
                       num_in, p_bclk, bclk, p_lrclk,
                       mclk_bclk_ratio_log2, config.mode);
 
@@ -198,11 +200,12 @@ inline void i2s_frame_master1(client interface i2s_frame_callback_if i,
         static const size_t num_i2s_out,
         in buffered port:32 i2s_din[num_i2s_in],
         static const size_t num_i2s_in,
+        static const size_t num_data_bits,
         out port i2s_bclk,
         out buffered port:32 i2s_lrclk,
         in port p_mclk,
         clock clk_bclk) {
-    i2s_frame_master0(i, i2s_dout, num_i2s_out, i2s_din, num_i2s_in,
+    i2s_frame_master0(i, i2s_dout, num_i2s_out, i2s_din, num_i2s_in, num_data_bits,
                 i2s_bclk, i2s_lrclk, p_mclk, clk_bclk);
 }
 

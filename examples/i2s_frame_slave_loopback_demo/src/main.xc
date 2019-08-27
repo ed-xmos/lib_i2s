@@ -262,7 +262,7 @@ int main()
 
   par {
     on tile[0]: while(1){
-      i2s_frame_slave(i_i2s_slave, p_dout, NUM_I2S_LINES, p_din, NUM_I2S_LINES, p_bclk, p_lrclk, clk_bclk);
+      i2s_frame_slave(i_i2s_slave, p_dout, NUM_I2S_LINES, p_din, NUM_I2S_LINES, 32, p_bclk, p_lrclk, clk_bclk);
       debug_printf("Exit\n");
     }
 

@@ -180,7 +180,7 @@ int main(){
 
     par {
       [[distribute]] app(i2s_i);
-      i2s_frame_slave(i2s_i, p_dout, NUM_OUT, p_din, NUM_IN,
+      i2s_frame_slave(i2s_i, p_dout, NUM_OUT, p_din, NUM_IN, 32,
                 p_bclk, p_lrclk, bclk);
       par(int i=0;i<7;i++){
         { set_core_fast_mode_on();
