@@ -154,7 +154,9 @@ int main()
       set_port_mode_clock(p_mclk);
       start_clock(mclk);
 #endif
-      i2s_frame_master(i_i2s, p_dout, NUM_I2S_LINES, p_din, NUM_I2S_LINES, p_bclk, p_lrclk, p_mclk, bclk);
+      const unsigned mclk_bclk_ratio = MASTER_CLOCK_FREQUENCY / (2 * N_I2S_DATA_BITS * SAMPLE_FREQUENCY);
+      configure_clock_src_divide(bclk, p_mclk, mclk_bclk_ratio / 2);
+      i2s_frame_master(i_i2s, p_dout, NUM_I2S_LINES, p_din, NUM_I2S_LINES, N_I2S_DATA_BITS, p_bclk, p_lrclk, bclk);
     }
 
     on tile[0]: [[distribute]] i2s_loopback(i_i2s);

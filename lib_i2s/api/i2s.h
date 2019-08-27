@@ -31,6 +31,7 @@ typedef enum i2s_slave_bclk_polarity_t {
  */
 typedef struct i2s_config_t {
   unsigned mclk_bclk_ratio; ///< The ratio between the master clock and bit clock signals.
+                            //   Note that this ignored for i2s_frame_master init
   i2s_mode_t mode;          ///< The mode of the LR clock.
   i2s_slave_bclk_polarity_t slave_bclk_polarity;  ///< Slave bit clock polarity.
 } i2s_config_t;
@@ -221,6 +222,14 @@ void i2s_master(client i2s_callback_if i2s_i,
  *  The component performs I2S master so will drive the word clock and
  *  bit clock lines.
  *
+ *  This task assumes that bclk has already been pre-copnfigured to generate a
+ *  bit clock from an appropriate source be it external (pin) or internal (xcore clock).
+ * 
+ *  Eg. generate a 3.072MHz BCLK from a 24.576MHz MCLK (1:8 BCLK to MCLK ratio)
+ *    configure_clock_src_divide(bclk, p_mclk, 8 / 2);
+ *  Eg. generate a 3.0864MHz BCLK from a 500MHz xcore clock (1:162 BCLK to core clock ratio)
+ *    configure_clock_xcore(bclk, 162 / 2);
+ *
  *  This is a more efficient version of i2s master which reduces callback
  *  frequency and allows useful processing to be done in distributable i2s handler tasks.
  *  It also uses xCORE200 specific features to remove the need for software
@@ -235,8 +244,7 @@ void i2s_master(client i2s_callback_if i2s_i,
  *  \param num_data_bits  The number of BCLKs per data word
  *  \param p_bclk         The bit clock output port
  *  \param p_lrclk        The word clock output port
- *  \param p_mclk         Input port which supplies the master clock
- *  \param bclk           A clock that will get configured for use with
+ *  \param bclk           A clock that will has been pre-configured to generate
  *                        the bit clock
  */
 void i2s_frame_master(client i2s_frame_callback_if i2s_i,
@@ -247,8 +255,7 @@ void i2s_frame_master(client i2s_frame_callback_if i2s_i,
                 static const size_t num_data_bits,
                 out port p_bclk,
                 out buffered port:32 p_lrclk,
-                in port p_mclk,
-                clock bclk);
+                const clock bclk);
 
 #endif // __XS2A__
 

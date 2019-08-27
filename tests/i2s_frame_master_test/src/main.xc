@@ -21,6 +21,7 @@ in port  setup_resp_port = XS1_PORT_1M;
 
 #define MAX_CHANNELS 8
 
+#define N_I2S_DATA_BITS 32
 
 
 
@@ -205,9 +206,13 @@ int main(){
     par {
         [[distribute]]
          app(i2s_i);
-      i2s_frame_master(i2s_i, p_dout, NUM_OUT, p_din, NUM_IN,
-                 p_bclk, p_lrclk, p_mclk, bclk);
-      par(int i=0;i<7;i++)while(1);
+        {
+            const unsigned mclk_bclk_ratio = MASTER_CLOCK_FREQUENCY / (2 * N_I2S_DATA_BITS * SAMPLE_FREQUENCY);
+            configure_clock_src_divide(bclk, p_mclk, mclk_bclk_ratio / 2);
+            i2s_frame_master(i2s_i, p_dout, NUM_OUT, p_din, NUM_IN, N_I2S_DATA_BITS,
+                     p_bclk, p_lrclk, bclk);
+        }
+        par(int i=0;i<7;i++)while(1);
     }
     return 0;
 }

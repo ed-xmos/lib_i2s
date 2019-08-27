@@ -20,6 +20,8 @@ on tile[0]: port p_gpio = XS1_PORT_8C;
 
 #define SAMPLE_FREQUENCY 48000
 #define MASTER_CLOCK_FREQUENCY 24576000
+#define N_I2S_DATA_BITS  32
+
 
 #define CS5368_ADDR           0x4C // I2C address of the CS5368 DAC
 #define CS5368_GCTL_MDE       0x01 // I2C mode control register number
@@ -119,15 +121,10 @@ void i2s_loopback(server i2s_frame_callback_if i2s,
 
     case i2s.receive(size_t n_chans, int32_t in_samps[n_chans]):
     for (int i = 0; i < n_chans; i++) samples[i] = in_samps[i]; // copy samples
-      printhexln(in_samps[0]);
       break;
 
     case i2s.send(size_t n_chans, int32_t out_samps[n_chans]):
-      for (int i = 0; i < n_chans; i++) out_samps[i] = samples[i]; // copy samples
-      out_samps[0] = 0x12345678;
-      //out_samps[0] = 0xf0aaaaaa;
-      out_samps[1] = 0x00000000;
-     
+      for (int i = 0; i < n_chans; i++) out_samps[i] = samples[i]; // copy samples     
       break;
 
     case i2s.restart_check() -> i2s_restart_t restart:
@@ -151,7 +148,12 @@ int main()
   interface output_gpio_if i_gpio[4];
   par {
     /* System setup, I2S + Codec control over I2C */
-    on tile[0]: i2s_frame_master(i_i2s, p_dout, 4, p_din, 4, 32, p_bclk, p_lrclk, p_mclk, bclk);
+    on tile[0]: {
+        // generate a 3.072MHz BCLK from a 24.576MHz MCLK (1:8 BCLK to MCLK ratio)
+        const unsigned mclk_bclk_ratio = MASTER_CLOCK_FREQUENCY / (2 * N_I2S_DATA_BITS * SAMPLE_FREQUENCY);
+        configure_clock_src_divide(bclk, p_mclk, mclk_bclk_ratio / 2);
+        i2s_frame_master(i_i2s, p_dout, 4, p_din, 4, 32, p_bclk, p_lrclk, bclk);
+    }
     on tile[0]: [[distribute]] i2c_master_single_port(i_i2c, 1, p_i2c, 100, 0, 1, 0);
     on tile[0]: [[distribute]] output_gpio(i_gpio, 4, p_gpio, gpio_pin_map);
 
