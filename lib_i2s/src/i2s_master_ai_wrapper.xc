@@ -1,32 +1,39 @@
 #include "i2s.h"
+extern "C"{
 #include "i2s_xcore_ai.h"
+}
 #include <print.h>
 #include <xccompat.h>
+#include <string.h>
 
 [[distributable]]
 void callback_handler(server i2s_frame_callback_if i2s_i){
     while(1){
         select{
             case i2s_i.init(i2s_config_t &?i2s_config, tdm_config_t &?tdm_config):
-                printstrln("i2s_i.init");
+                i2s_config_t i2s_config_copy;
+                i2s_master_init(&i2s_config_copy);
+                memcpy(&i2s_config, &i2s_config_copy, sizeof(i2s_config));
             break;
 
             case i2s_i.restart_check() -> i2s_restart_t restart:
-                // printstrln("i2s_i.restart_check");
-                restart = I2S_NO_RESTART;
+                restart = i2s_master_restart_check();
             break;
 
             case i2s_i.receive(size_t num_in, int32_t samples[num_in]):
-                // printstrln("i2s_i.receive");
+                int32_t samples_copy[2];
+                i2s_master_receive(num_in, samples_copy);
+                memcpy(samples_copy, samples, sizeof(samples_copy));
             break;
 
             case i2s_i.send(size_t num_out, int32_t samples[num_out]):
-                // printstrln("i2s_i.send");
+                int32_t samples_copy[2];
+                memcpy(samples, samples_copy, sizeof(samples_copy));
+                i2s_master_send(num_out, samples_copy);
             break;
         }
     }
 }
-
 
 
 void i2s_master_ai(
@@ -42,9 +49,9 @@ void i2s_master_ai(
 
     i2s_frame_callback_if i2s_i;
 
-    // [[distribute]]
     par{
         {
+            //Reconfigure the ports so they are in the correct modes
             out port * movable ppo = p_dout;
             out buffered port:32 * p_dout_recon = reconfigure_port(move(ppo), out buffered port:32);
             in port * movable ppi = p_din;
@@ -63,6 +70,7 @@ void i2s_master_ai(
                 p_mclk,
                 bclk);
         }
+        [[distribute]]
         callback_handler(i2s_i);
     }
 }

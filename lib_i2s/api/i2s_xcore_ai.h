@@ -48,6 +48,7 @@ typedef enum i2s_restart_t {
   I2S_SHUTDOWN             ///< Shutdown. This will cause the I2S/TDM component to exit.
 } i2s_restart_t;
 
+#endif
 
 /**  I2S frame-based initialization event callback.
 *
@@ -98,7 +99,7 @@ void i2s_master_receive(size_t num_in, int32_t samples[num_in]);
 */
 void i2s_master_send(size_t num_out, int32_t samples[num_out]);
 
-
+#ifndef __XC__
 /** I2S frame-based master component
  *
  *  This task performs I2S on the provided pins. It will perform callbacks over
@@ -162,7 +163,6 @@ void i2s_slave_ai(
         port_t p_bclk,
         port_t p_lrclk,
         xclock_t bclk);
-
 #endif
 
 
