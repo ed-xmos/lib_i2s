@@ -62,6 +62,7 @@ void i2s_master_ai(
             out buffered port:32 * p_lrclk_recon = reconfigure_port(move(ppl), out buffered port:32);
             i2s_frame_master(i2s_i,
                 p_dout_recon,
+//TODO Work out way to pass constant through - probably a horrible define
                 1,//num_out,
                 p_din_recon,
                 1,//num_in,
