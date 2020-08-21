@@ -22,14 +22,14 @@ void callback_handler(server i2s_frame_callback_if i2s_i){
 
             case i2s_i.receive(size_t num_in, int32_t samples[num_in]):
                 int32_t samples_copy[2];
-                i2s_master_receive(num_in, samples_copy);
                 memcpy(samples_copy, samples, sizeof(samples_copy));
+                i2s_master_receive(num_in, samples_copy);
             break;
 
             case i2s_i.send(size_t num_out, int32_t samples[num_out]):
                 int32_t samples_copy[2];
-                memcpy(samples, samples_copy, sizeof(samples_copy));
                 i2s_master_send(num_out, samples_copy);
+                memcpy(samples, samples_copy, sizeof(samples_copy));
             break;
         }
     }
